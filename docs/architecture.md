@@ -19,6 +19,9 @@
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
 │  │ 채널 관리    │  │ 파일 업로드  │  │ 질의응답     │              │
 │  └─────────────┘  └─────────────┘  └─────────────┘              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │ 용량 관리    │  │ 스케줄러    │  │ 관리자 통계  │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -30,15 +33,16 @@
 │  └─────────┘    └─────────┘    └─────────┘    └─────────┘      │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Gemini File Search API                        │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │ Store A (채널1)  │  │ Store B (채널2)  │  │ Store C (채널3)  │  │
-│  │ - 문서1.pdf     │  │ - 논문1.pdf     │  │ - 계약서1.pdf   │  │
-│  │ - 문서2.docx    │  │ - 논문2.pdf     │  │ - 계약서2.pdf   │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│    Gemini File Search   │     │      SQLite (Local)     │
+│  ┌───────────────────┐  │     │  ┌───────────────────┐  │
+│  │ Store A (채널1)    │  │     │  │ 채널 메타데이터    │  │
+│  │ Store B (채널2)    │  │     │  │ 채팅 히스토리      │  │
+│  │ Store C (채널3)    │  │     │  │ 용량 추적         │  │
+│  └───────────────────┘  │     │  └───────────────────┘  │
+└─────────────────────────┘     └─────────────────────────┘
 ```
 
 ## 핵심 개념
@@ -60,6 +64,12 @@
 - 채널 내 문서를 기반으로 RAG 수행
 - 출처(grounding) 정보 포함 응답
 
+### 생애주기 관리
+
+- 채널 활성/비활성 상태 추적
+- 비활성 채널 자동 정리 (스케줄러)
+- 용량 제한 및 모니터링
+
 ## 기술 스택
 
 | 레이어 | 기술 |
@@ -68,6 +78,8 @@
 | 워크플로우 | LangGraph 1.0 |
 | RAG 엔진 | Gemini File Search API |
 | LLM | Gemini 2.5 Flash |
+| 로컬 DB | SQLite + SQLAlchemy |
+| 스케줄러 | APScheduler |
 | 언어 | Python 3.11+ |
 | 테스트 | pytest |
 
@@ -83,21 +95,39 @@ chalssak/
 │   └── development.md
 ├── src/                     # 소스 코드
 │   ├── api/                 # FastAPI 라우터
-│   │   ├── channels.py
-│   │   ├── documents.py
-│   │   └── chat.py
-│   ├── core/                # 핵심 로직
+│   │   └── v1/
+│   │       ├── router.py    # 라우터 통합
+│   │       ├── channels.py
+│   │       ├── documents.py
+│   │       ├── chat.py
+│   │       ├── capacity.py
+│   │       ├── admin.py
+│   │       ├── scheduler.py
+│   │       └── health.py
+│   ├── core/                # 핵심 설정
 │   │   ├── config.py
-│   │   └── dependencies.py
+│   │   └── database.py
+│   ├── models/              # Pydantic 모델
+│   │   ├── channel.py
+│   │   ├── document.py
+│   │   ├── chat.py
+│   │   └── capacity.py
 │   ├── services/            # 비즈니스 로직
-│   │   ├── channel_service.py
-│   │   ├── document_service.py
-│   │   └── chat_service.py
+│   │   ├── gemini.py        # Gemini API 클라이언트
+│   │   ├── crawler.py       # URL 크롤러
+│   │   ├── channel_repository.py
+│   │   ├── capacity_service.py
+│   │   ├── lifecycle_policy.py
+│   │   ├── admin_stats.py
+│   │   ├── api_metrics.py
+│   │   └── scheduler.py
 │   ├── workflows/           # LangGraph 워크플로우
-│   │   ├── rag_workflow.py
-│   │   └── nodes/
+│   │   └── rag.py
 │   └── main.py              # 앱 진입점
 ├── tests/                   # 테스트
+│   ├── api/v1/
+│   ├── services/
+│   └── conftest.py
 ├── poc/                     # POC 코드
 ├── .env                     # 환경변수 (Git 제외)
 ├── .gitignore
@@ -109,29 +139,48 @@ chalssak/
 
 | Phase | 목표 | 상태 |
 |-------|------|------|
-| 1 | API 분석 및 POC | 완료 |
-| 2 | 핵심 백엔드 구현 | 예정 |
-| 3 | 채널 생애주기 관리 | 예정 |
-| 4 | 확장 기능 (옵션) | 예정 |
+| 1 | API 분석 및 POC | ✅ 완료 |
+| 2 | 핵심 백엔드 구현 | ✅ 완료 |
+| 3 | 채널 생애주기 관리 | ✅ 완료 |
+| 4 | 확장 기능 (옵션) | 백로그 |
 
 ## 데이터 흐름
 
 ### 채널 생성
 
 ```
-사용자 요청 -> FastAPI -> channel_service -> Gemini API (Store 생성) -> 응답
+사용자 요청 -> FastAPI -> GeminiService -> Gemini API (Store 생성)
+                      -> ChannelRepository -> SQLite (메타데이터 저장)
 ```
 
 ### 파일 업로드
 
 ```
-파일 업로드 -> FastAPI -> document_service -> Gemini API (Store에 import) -> 응답
+파일 업로드 -> FastAPI -> CapacityService (용량 검증)
+                      -> GeminiService -> Gemini API (Store에 import)
+                      -> ChannelRepository -> SQLite (용량 업데이트)
+```
+
+### URL 업로드
+
+```
+URL 요청 -> FastAPI -> CrawlerService (크롤링 + 마크다운 변환)
+                    -> GeminiService -> Gemini API (업로드)
 ```
 
 ### 질의응답
 
 ```
-질문 -> FastAPI -> LangGraph 워크플로우 -> Gemini API (검색 + 생성) -> 응답
+질문 -> FastAPI -> LangGraph 워크플로우 -> GeminiService (검색 + 생성)
+               -> ChatHistoryRepository -> SQLite (히스토리 저장)
+```
+
+### 비활성 채널 정리 (스케줄러)
+
+```
+APScheduler (매일 00:00) -> LifecyclePolicy (비활성 감지)
+                        -> GeminiService (Store 삭제)
+                        -> ChannelRepository (메타데이터 삭제)
 ```
 
 ## 제약사항
@@ -139,6 +188,9 @@ chalssak/
 | 항목 | 제한 |
 |------|------|
 | 파일 크기 | 최대 100MB |
+| 채널당 파일 수 | 최대 50개 (설정 가능) |
+| 채널당 용량 | 최대 100MB (설정 가능) |
 | 저장소 용량 (Free) | 1GB |
 | 저장소 용량 (권장) | 20GB 이하/Store |
 | 쿼리당 Store | 최대 5개 |
+| 비활성 기준 | 90일 미접근 |
