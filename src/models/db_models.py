@@ -41,6 +41,8 @@ class ChannelMetadata(Base):
     notes = relationship("NoteDB", back_populates="channel", cascade="all, delete-orphan")
     # Relationship to search history
     search_history = relationship("SearchHistoryDB", back_populates="channel", cascade="all, delete-orphan")
+    # Relationship to audio overviews
+    audio_overviews = relationship("AudioOverviewDB", back_populates="channel", cascade="all, delete-orphan")
 
     def touch(self):
         """Update last accessed time."""
@@ -152,3 +154,26 @@ class DocumentPreviewCacheDB(Base):
     total_characters = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class AudioOverviewDB(Base):
+    """Audio overview (podcast) for channels."""
+
+    __tablename__ = "audio_overviews"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    audio_id = Column(String(64), unique=True, nullable=False, index=True)
+    channel_id = Column(Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="pending")  # pending, generating_script, generating_audio, completed, failed
+    title = Column(String(300), nullable=True)
+    script_json = Column(Text, nullable=True)  # JSON of PodcastScript
+    audio_path = Column(String(500), nullable=True)  # Path to audio file
+    duration_seconds = Column(Integer, nullable=True)
+    language = Column(String(10), default="ko")
+    style = Column(String(20), default="conversational")
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationship to channel
+    channel = relationship("ChannelMetadata", back_populates="audio_overviews")

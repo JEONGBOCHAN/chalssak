@@ -31,5 +31,14 @@ class RateLimits:
     # File upload endpoints - 20 requests per hour
     FILE_UPLOAD = "20/hour"
 
+    # Upload/Create endpoints - 30 requests per hour
+    UPLOAD = "30/hour"
+
+    # List endpoints - 60 requests per minute
+    LIST = "60/minute"
+
+    # Download/Stream endpoints - 100 requests per minute
+    DOWNLOAD = "100/minute"
+
     # Default for other endpoints - 100 requests per minute
     DEFAULT = "100/minute"

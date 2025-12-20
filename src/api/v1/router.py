@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter
 
-from src.api.v1 import health, channels, documents, chat, capacity, scheduler, admin, notes, faq, summarize, search, citations, favorites, preview, trash, export, timeline
+from src.api.v1 import health, channels, documents, chat, capacity, scheduler, admin, notes, faq, summarize, search, citations, favorites, preview, trash, export, timeline, youtube, study, audio
 
 api_router = APIRouter()
 
@@ -54,6 +54,15 @@ api_router.include_router(trash.router)
 
 # Timeline/Briefing generation API
 api_router.include_router(timeline.router)
+
+# YouTube source API
+api_router.include_router(youtube.router)
+
+# Study guide and quiz API
+api_router.include_router(study.router)
+
+# Audio Overview (Podcast) API
+api_router.include_router(audio.router)
 
 # Channel CRUD
 api_router.include_router(channels.router)

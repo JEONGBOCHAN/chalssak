@@ -1171,6 +1171,384 @@ Example format:
             }
 
 
+    # ========== Study Guide Operations ==========
+
+    def generate_study_guide(
+        self,
+        store_name: str,
+        include_concepts: bool = True,
+        include_summary: bool = True,
+        max_sections: int = 5,
+        difficulty: str = "medium",
+        model: str = "gemini-2.5-flash",
+    ) -> dict[str, Any]:
+        """Generate a study guide from documents in the store.
+
+        Creates a structured study guide with sections, key concepts,
+        and study tips based on the document content.
+
+        Args:
+            store_name: The store name/ID to analyze
+            include_concepts: Whether to include key concepts section
+            include_summary: Whether to include overview summary
+            max_sections: Maximum number of sections (1-10)
+            difficulty: Target difficulty level (easy, medium, hard)
+            model: The model to use for generation
+
+        Returns:
+            Dict with study guide structure
+        """
+        difficulty_instruction = {
+            "easy": "Use simple language and focus on fundamental concepts. Avoid jargon.",
+            "medium": "Balance depth and accessibility. Include some technical details.",
+            "hard": "Provide in-depth analysis with technical details and advanced concepts.",
+        }.get(difficulty, "Balance depth and accessibility.")
+
+        concepts_instruction = ""
+        if include_concepts:
+            concepts_instruction = """
+- "key_concepts": An array of important terms/concepts, each with:
+  - "term": The concept name (string)
+  - "definition": Clear explanation (string)
+  - "importance": Why this concept matters (string, optional)"""
+
+        prompt = f"""Analyze all documents in this knowledge base and create a comprehensive study guide.
+
+{difficulty_instruction}
+
+Structure your response as a JSON object with these fields:
+- "title": A descriptive title for the study guide (string)
+- "overview": A brief overview of what will be learned (1-2 paragraphs)
+- "sections": An array of up to {max_sections} study sections, each with:
+  - "title": Section title (string)
+  - "content": Detailed explanation (string, multiple paragraphs)
+  - "key_points": Array of key points to remember (strings){concepts_instruction}
+- "study_tips": Array of 3-5 practical study tips for this material (strings)
+
+Return ONLY the JSON object, no other text.
+
+Example format:
+{{
+  "title": "Complete Guide to Machine Learning",
+  "overview": "This study guide covers...",
+  "sections": [
+    {{
+      "title": "Introduction to ML",
+      "content": "Machine learning is...",
+      "key_points": ["ML automates pattern recognition", "Supervised vs unsupervised learning"]
+    }}
+  ],
+  "key_concepts": [
+    {{"term": "Neural Network", "definition": "A computing system inspired by biological neural networks", "importance": "Foundation of deep learning"}}
+  ],
+  "study_tips": ["Start with the basics", "Practice with real datasets"]
+}}"""
+
+        try:
+            response = self._client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[
+                        types.Tool(
+                            file_search=types.FileSearch(
+                                file_search_store_names=[store_name]
+                            )
+                        )
+                    ],
+                    response_mime_type="application/json",
+                ),
+            )
+
+            import json
+            try:
+                guide = json.loads(response.text) if response.text else {}
+            except json.JSONDecodeError:
+                text = response.text or ""
+                start = text.find("{")
+                end = text.rfind("}") + 1
+                if start != -1 and end > start:
+                    guide = json.loads(text[start:end])
+                else:
+                    guide = {}
+
+            return {
+                "title": guide.get("title", "Study Guide"),
+                "overview": guide.get("overview", ""),
+                "sections": guide.get("sections", []),
+                "key_concepts": guide.get("key_concepts", []) if include_concepts else [],
+                "study_tips": guide.get("study_tips", []),
+            }
+
+        except Exception as e:
+            return {
+                "title": "",
+                "overview": "",
+                "sections": [],
+                "key_concepts": [],
+                "study_tips": [],
+                "error": str(e),
+            }
+
+    # ========== Quiz Operations ==========
+
+    def generate_quiz(
+        self,
+        store_name: str,
+        count: int = 5,
+        quiz_type: str = "mixed",
+        difficulty: str = "medium",
+        include_explanations: bool = True,
+        model: str = "gemini-2.5-flash",
+    ) -> dict[str, Any]:
+        """Generate a quiz based on documents in the store.
+
+        Creates quiz questions with various types based on the document content.
+
+        Args:
+            store_name: The store name/ID to analyze
+            count: Number of questions to generate (1-20)
+            quiz_type: Type of questions (multiple_choice, short_answer, true_false, mixed)
+            difficulty: Target difficulty level (easy, medium, hard)
+            include_explanations: Whether to include answer explanations
+            model: The model to use for generation
+
+        Returns:
+            Dict with quiz structure including questions
+        """
+        difficulty_instruction = {
+            "easy": "Create straightforward questions testing basic comprehension.",
+            "medium": "Create questions requiring understanding and some analysis.",
+            "hard": "Create challenging questions requiring deep understanding and critical thinking.",
+        }.get(difficulty, "Create questions requiring understanding and some analysis.")
+
+        type_instruction = {
+            "multiple_choice": "All questions must be multiple choice with 4 options (A, B, C, D).",
+            "short_answer": "All questions must be short answer requiring brief written responses.",
+            "true_false": "All questions must be true/false format.",
+            "mixed": "Mix question types: include multiple choice, short answer, and true/false questions.",
+        }.get(quiz_type, "Mix question types.")
+
+        explanation_field = ""
+        if include_explanations:
+            explanation_field = '  - "explanation": Why this is the correct answer (string)'
+
+        prompt = f"""Analyze all documents in this knowledge base and create a quiz with exactly {count} questions.
+
+{difficulty_instruction}
+{type_instruction}
+
+Structure your response as a JSON object with these fields:
+- "title": A descriptive title for the quiz (string)
+- "description": Brief description of what the quiz covers (string)
+- "questions": An array of exactly {count} questions, each with:
+  - "question": The question text (string)
+  - "question_type": One of "multiple_choice", "short_answer", or "true_false" (string)
+  - "choices": For multiple choice, array of objects with "label" (A/B/C/D), "text", "is_correct" (boolean). Null for other types.
+  - "correct_answer": The correct answer (string)
+  - "difficulty": "{difficulty}" (string)
+{explanation_field}
+
+Return ONLY the JSON object, no other text.
+
+Example format:
+{{
+  "title": "Machine Learning Fundamentals Quiz",
+  "description": "Test your knowledge of basic ML concepts",
+  "questions": [
+    {{
+      "question": "What is supervised learning?",
+      "question_type": "multiple_choice",
+      "choices": [
+        {{"label": "A", "text": "Learning with labeled data", "is_correct": true}},
+        {{"label": "B", "text": "Learning without labels", "is_correct": false}},
+        {{"label": "C", "text": "Reinforcement learning", "is_correct": false}},
+        {{"label": "D", "text": "Transfer learning", "is_correct": false}}
+      ],
+      "correct_answer": "A. Learning with labeled data",
+      "difficulty": "medium",
+      "explanation": "Supervised learning uses labeled training data..."
+    }},
+    {{
+      "question": "Neural networks are inspired by biological neurons.",
+      "question_type": "true_false",
+      "choices": null,
+      "correct_answer": "True",
+      "difficulty": "easy",
+      "explanation": "Neural networks were designed to mimic..."
+    }}
+  ]
+}}"""
+
+        try:
+            response = self._client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[
+                        types.Tool(
+                            file_search=types.FileSearch(
+                                file_search_store_names=[store_name]
+                            )
+                        )
+                    ],
+                    response_mime_type="application/json",
+                ),
+            )
+
+            import json
+            try:
+                quiz = json.loads(response.text) if response.text else {}
+            except json.JSONDecodeError:
+                text = response.text or ""
+                start = text.find("{")
+                end = text.rfind("}") + 1
+                if start != -1 and end > start:
+                    quiz = json.loads(text[start:end])
+                else:
+                    quiz = {}
+
+            return {
+                "title": quiz.get("title", "Quiz"),
+                "description": quiz.get("description", ""),
+                "questions": quiz.get("questions", []),
+            }
+
+        except Exception as e:
+            return {
+                "title": "",
+                "description": "",
+                "questions": [],
+                "error": str(e),
+            }
+
+    # ========== Audio Overview (Podcast) Operations ==========
+
+    def generate_podcast_script(
+        self,
+        store_name: str,
+        duration_minutes: int = 5,
+        style: str = "conversational",
+        language: str = "ko",
+        model: str = "gemini-2.5-flash",
+    ) -> dict[str, Any]:
+        """Generate a podcast script from documents in the store.
+
+        Creates a conversational dialogue between two AI hosts discussing
+        the document content.
+
+        Args:
+            store_name: The store name/ID to analyze
+            duration_minutes: Target duration in minutes (1-15)
+            style: 'conversational' (casual) or 'professional' (formal)
+            language: Language code (ko, en, etc.)
+            model: The model to use for generation
+
+        Returns:
+            Dict with podcast script structure
+        """
+        # Estimate words based on duration (approx 150 words/minute for natural speech)
+        target_words = duration_minutes * 150
+
+        if style == "professional":
+            style_instruction = """Use a professional, formal tone. The hosts should sound like news anchors or documentary narrators. Avoid colloquialisms and maintain a serious, informative demeanor."""
+        else:
+            style_instruction = """Use a casual, conversational tone. The hosts should sound like friends having an engaging discussion. Include natural reactions, brief interruptions, and informal language to make it feel authentic."""
+
+        language_instruction = {
+            "ko": "모든 대화는 한국어로 작성하세요. 자연스러운 한국어 표현을 사용하세요.",
+            "en": "Write all dialogue in English. Use natural English expressions.",
+            "ja": "すべての会話を日本語で書いてください。自然な日本語表現を使用してください。",
+        }.get(language, "Write all dialogue in the appropriate language for natural expression.")
+
+        prompt = f"""Analyze all documents in this knowledge base and create an engaging podcast script with two hosts discussing the content.
+
+{style_instruction}
+{language_instruction}
+
+The podcast should be approximately {duration_minutes} minutes long (about {target_words} words total).
+
+Host A is the main presenter who introduces topics and asks questions.
+Host B is the expert who provides explanations and insights.
+
+Structure your response as a JSON object with these fields:
+- "title": An engaging podcast episode title (string)
+- "introduction": A brief introduction that Host A will read to open the show (string, 2-3 sentences)
+- "dialogue": An array of dialogue lines, each with:
+  - "speaker": "Host A" or "Host B" (string)
+  - "text": The dialogue text (string)
+- "conclusion": Closing remarks summarizing key points (string, 2-3 sentences)
+- "estimated_duration_seconds": Estimated duration in seconds (integer)
+
+Guidelines:
+- Start with Host A introducing the topic
+- Alternate between hosts naturally
+- Include questions from Host A that Host B answers
+- Add reactions like "That's interesting!" or "I see" for natural flow
+- Cover the main points from the documents
+- End with a summary and call-to-action
+
+Return ONLY the JSON object, no other text.
+
+Example format:
+{{
+  "title": "Understanding Machine Learning: A Deep Dive",
+  "introduction": "Welcome to today's episode! We're exploring the fascinating world of machine learning...",
+  "dialogue": [
+    {{"speaker": "Host A", "text": "So, let's start with the basics. What exactly is machine learning?"}},
+    {{"speaker": "Host B", "text": "Great question! Machine learning is essentially..."}}
+  ],
+  "conclusion": "That wraps up our discussion on machine learning. Remember, the key takeaways are...",
+  "estimated_duration_seconds": 300
+}}"""
+
+        try:
+            response = self._client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[
+                        types.Tool(
+                            file_search=types.FileSearch(
+                                file_search_store_names=[store_name]
+                            )
+                        )
+                    ],
+                    response_mime_type="application/json",
+                ),
+            )
+
+            import json
+            try:
+                script = json.loads(response.text) if response.text else {}
+            except json.JSONDecodeError:
+                text = response.text or ""
+                start = text.find("{")
+                end = text.rfind("}") + 1
+                if start != -1 and end > start:
+                    script = json.loads(text[start:end])
+                else:
+                    script = {}
+
+            return {
+                "title": script.get("title", "Podcast Episode"),
+                "introduction": script.get("introduction", ""),
+                "dialogue": script.get("dialogue", []),
+                "conclusion": script.get("conclusion", ""),
+                "estimated_duration_seconds": script.get("estimated_duration_seconds", duration_minutes * 60),
+            }
+
+        except Exception as e:
+            return {
+                "title": "",
+                "introduction": "",
+                "dialogue": [],
+                "conclusion": "",
+                "estimated_duration_seconds": 0,
+                "error": str(e),
+            }
+
+
 @lru_cache
 def get_gemini_service() -> GeminiService:
     """Get cached GeminiService instance."""
