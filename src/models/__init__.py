@@ -8,6 +8,13 @@ from src.models.document import (
     DocumentUploadResponse,
     UploadStatus,
 )
+from src.models.chat import (
+    ChatRequest,
+    ChatResponse,
+    ChatMessage,
+    ChatHistory,
+    GroundingSource,
+)
 
 __all__ = [
     "ChannelCreate",
@@ -17,4 +24,9 @@ __all__ = [
     "DocumentList",
     "DocumentUploadResponse",
     "UploadStatus",
+    "ChatRequest",
+    "ChatResponse",
+    "ChatMessage",
+    "ChatHistory",
+    "GroundingSource",
 ]

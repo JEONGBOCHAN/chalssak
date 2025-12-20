@@ -184,6 +184,67 @@ class GeminiService:
         except Exception:
             return False
 
+    # ========== Chat/Search Operations ==========
+
+    def search_and_answer(
+        self,
+        store_name: str,
+        query: str,
+        model: str = "gemini-2.5-flash",
+    ) -> dict[str, Any]:
+        """Search documents and generate an answer.
+
+        Uses Gemini File Search API to search documents in the store
+        and generate a grounded response.
+
+        Args:
+            store_name: The store name/ID to search in
+            query: The user's question
+            model: The model to use for generation
+
+        Returns:
+            Response with answer and grounding sources
+        """
+        try:
+            response = self._client.models.generate_content(
+                model=model,
+                contents=query,
+                config=types.GenerateContentConfig(
+                    tools=[
+                        types.Tool(
+                            file_search=types.FileSearch(
+                                file_search_store_names=[store_name]
+                            )
+                        )
+                    ]
+                ),
+            )
+
+            # Extract grounding sources from response
+            sources = []
+            if hasattr(response, "candidates") and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, "grounding_metadata"):
+                    metadata = candidate.grounding_metadata
+                    if hasattr(metadata, "grounding_chunks"):
+                        for chunk in metadata.grounding_chunks:
+                            sources.append({
+                                "source": getattr(chunk, "source", "unknown"),
+                                "content": getattr(chunk, "text", ""),
+                            })
+
+            return {
+                "response": response.text if response.text else "",
+                "sources": sources,
+            }
+
+        except Exception as e:
+            return {
+                "response": "",
+                "error": str(e),
+                "sources": [],
+            }
+
 
 @lru_cache
 def get_gemini_service() -> GeminiService:

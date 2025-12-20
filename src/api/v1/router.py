@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter
 
-from src.api.v1 import health, channels, documents
+from src.api.v1 import health, channels, documents, chat
 
 api_router = APIRouter()
 
@@ -13,8 +13,8 @@ api_router.include_router(health.router, tags=["health"])
 # channels' /{channel_id:path} if channels came first
 api_router.include_router(documents.router)
 
+# Chat API
+api_router.include_router(chat.router)
+
 # Channel CRUD
 api_router.include_router(channels.router)
-
-# TODO: Add more routers
-# api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
