@@ -17,6 +17,13 @@ class ChannelCreate(BaseModel):
     description: str | None = Field(default=None, max_length=500, description="Channel description")
 
 
+class ChannelUpdate(BaseModel):
+    """Request model for updating a channel."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=100, description="New channel name")
+    description: str | None = Field(default=None, max_length=500, description="New channel description")
+
+
 class ChannelResponse(BaseModel):
     """Response model for a channel."""
 

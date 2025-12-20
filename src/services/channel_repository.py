@@ -114,6 +114,33 @@ class ChannelRepository:
             self.db.refresh(channel)
         return channel
 
+    def update(
+        self,
+        gemini_store_id: str,
+        name: str | None = None,
+        description: str | None = None,
+    ) -> ChannelMetadata | None:
+        """Update channel metadata.
+
+        Args:
+            gemini_store_id: The Gemini File Search Store ID
+            name: New channel name (if provided)
+            description: New channel description (if provided)
+
+        Returns:
+            Updated ChannelMetadata or None if not found
+        """
+        channel = self.get_by_gemini_id(gemini_store_id)
+        if channel:
+            if name is not None:
+                channel.name = name
+            if description is not None:
+                channel.description = description
+            channel.last_accessed_at = datetime.now(UTC)
+            self.db.commit()
+            self.db.refresh(channel)
+        return channel
+
     def delete(self, gemini_store_id: str) -> bool:
         """Delete channel metadata.
 

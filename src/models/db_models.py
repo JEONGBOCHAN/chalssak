@@ -29,6 +29,8 @@ class ChannelMetadata(Base):
 
     # Relationship to chat messages
     messages = relationship("ChatMessageDB", back_populates="channel", cascade="all, delete-orphan")
+    # Relationship to notes
+    notes = relationship("NoteDB", back_populates="channel", cascade="all, delete-orphan")
 
     def touch(self):
         """Update last accessed time."""
@@ -49,3 +51,20 @@ class ChatMessageDB(Base):
 
     # Relationship to channel
     channel = relationship("ChannelMetadata", back_populates="messages")
+
+
+class NoteDB(Base):
+    """Note for saving user notes and AI responses."""
+
+    __tablename__ = "notes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    channel_id = Column(Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    sources_json = Column(Text, default="[]")  # JSON array of sources if from AI
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+    # Relationship to channel
+    channel = relationship("ChannelMetadata", back_populates="notes")

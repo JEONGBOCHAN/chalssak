@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from src.models.channel import ChannelCreate, ChannelResponse, ChannelList
+from src.models.channel import ChannelCreate, ChannelUpdate, ChannelResponse, ChannelList
 from src.services.gemini import GeminiService, get_gemini_service
 from src.core.database import get_db
 from src.services.channel_repository import ChannelRepository
@@ -133,6 +133,64 @@ def get_channel(
         description=local_meta.description if local_meta else None,
         created_at=local_meta.created_at if local_meta else datetime.now(UTC),
         file_count=local_meta.file_count if local_meta else 0,
+    )
+
+
+@router.put(
+    "/{channel_id:path}",
+    response_model=ChannelResponse,
+    summary="Update a channel",
+)
+def update_channel(
+    channel_id: str,
+    data: ChannelUpdate,
+    gemini: Annotated[GeminiService, Depends(get_gemini_service)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ChannelResponse:
+    """Update a channel's name and/or description.
+
+    Note: channel_id should be the full store name (e.g., "fileSearchStores/xxx")
+    """
+    # Check if channel exists in Gemini
+    store = gemini.get_store(channel_id)
+    if not store:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Channel not found: {channel_id}",
+        )
+
+    # Check if at least one field is provided
+    if data.name is None and data.description is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one of 'name' or 'description' must be provided",
+        )
+
+    # Update local metadata
+    repo = ChannelRepository(db)
+    local_meta = repo.get_by_gemini_id(channel_id)
+
+    if not local_meta:
+        # Create local metadata if not exists
+        local_meta = repo.create(
+            gemini_store_id=channel_id,
+            name=data.name or store.get("display_name", ""),
+            description=data.description,
+        )
+    else:
+        # Update existing metadata
+        local_meta = repo.update(
+            gemini_store_id=channel_id,
+            name=data.name,
+            description=data.description,
+        )
+
+    return ChannelResponse(
+        id=channel_id,
+        name=local_meta.name,
+        description=local_meta.description,
+        created_at=local_meta.created_at,
+        file_count=local_meta.file_count,
     )
 
 

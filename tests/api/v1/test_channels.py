@@ -207,3 +207,109 @@ class TestDeleteChannel:
         assert "Failed to delete" in response.json()["detail"]
 
         app.dependency_overrides.pop(get_gemini_service, None)
+
+
+class TestUpdateChannel:
+    """Tests for PUT /api/v1/channels/{channel_id}."""
+
+    def test_update_channel_name_success(self, client_with_db: TestClient, test_db):
+        """Test updating channel name."""
+        mock_gemini = MagicMock()
+        mock_gemini.get_store.return_value = {
+            "name": "fileSearchStores/store-123",
+            "display_name": "Old Name",
+        }
+
+        app.dependency_overrides[get_gemini_service] = lambda: mock_gemini
+
+        response = client_with_db.put(
+            "/api/v1/channels/fileSearchStores/store-123",
+            json={"name": "New Name"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "fileSearchStores/store-123"
+        assert data["name"] == "New Name"
+
+        app.dependency_overrides.pop(get_gemini_service, None)
+
+    def test_update_channel_description_success(self, client_with_db: TestClient, test_db):
+        """Test updating channel description."""
+        mock_gemini = MagicMock()
+        mock_gemini.get_store.return_value = {
+            "name": "fileSearchStores/store-123",
+            "display_name": "My Channel",
+        }
+
+        app.dependency_overrides[get_gemini_service] = lambda: mock_gemini
+
+        response = client_with_db.put(
+            "/api/v1/channels/fileSearchStores/store-123",
+            json={"description": "New description"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["description"] == "New description"
+
+        app.dependency_overrides.pop(get_gemini_service, None)
+
+    def test_update_channel_both_fields(self, client_with_db: TestClient, test_db):
+        """Test updating both name and description."""
+        mock_gemini = MagicMock()
+        mock_gemini.get_store.return_value = {
+            "name": "fileSearchStores/store-123",
+            "display_name": "Old Name",
+        }
+
+        app.dependency_overrides[get_gemini_service] = lambda: mock_gemini
+
+        response = client_with_db.put(
+            "/api/v1/channels/fileSearchStores/store-123",
+            json={"name": "New Name", "description": "New description"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "New Name"
+        assert data["description"] == "New description"
+
+        app.dependency_overrides.pop(get_gemini_service, None)
+
+    def test_update_channel_not_found(self, client_with_db: TestClient, test_db):
+        """Test updating non-existent channel returns 404."""
+        mock_gemini = MagicMock()
+        mock_gemini.get_store.return_value = None
+
+        app.dependency_overrides[get_gemini_service] = lambda: mock_gemini
+
+        response = client_with_db.put(
+            "/api/v1/channels/fileSearchStores/not-exists",
+            json={"name": "New Name"},
+        )
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+        app.dependency_overrides.pop(get_gemini_service, None)
+
+    def test_update_channel_empty_body(self, client_with_db: TestClient, test_db):
+        """Test updating with no fields returns 400."""
+        mock_gemini = MagicMock()
+        mock_gemini.get_store.return_value = {
+            "name": "fileSearchStores/store-123",
+            "display_name": "My Channel",
+        }
+
+        app.dependency_overrides[get_gemini_service] = lambda: mock_gemini
+
+        response = client_with_db.put(
+            "/api/v1/channels/fileSearchStores/store-123",
+            json={},
+        )
+
+        assert response.status_code == 400
+        assert "At least one" in response.json()["detail"]
+
+        app.dependency_overrides.pop(get_gemini_service, None)
