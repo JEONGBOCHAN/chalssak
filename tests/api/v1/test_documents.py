@@ -149,6 +149,27 @@ class TestListDocuments:
 
         app.dependency_overrides.clear()
 
+    def test_list_documents_api_error(self, client: TestClient):
+        """Test listing documents handles API errors."""
+        mock_gemini = MagicMock()
+        mock_gemini.get_store.return_value = {
+            "name": "fileSearchStores/test-store",
+            "display_name": "Test Channel",
+        }
+        mock_gemini.list_store_files.side_effect = Exception("API Error")
+
+        app.dependency_overrides[get_gemini_service] = lambda: mock_gemini
+
+        response = client.get(
+            "/api/v1/documents",
+            params={"channel_id": "fileSearchStores/test-store"},
+        )
+
+        assert response.status_code == 500
+        assert "Failed to list documents" in response.json()["detail"]
+
+        app.dependency_overrides.clear()
+
 
 class TestGetDocumentStatus:
     """Tests for GET /api/v1/documents/{document_id}/status."""
