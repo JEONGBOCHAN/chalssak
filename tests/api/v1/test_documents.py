@@ -79,6 +79,36 @@ class TestUploadDocument:
 
         app.dependency_overrides.clear()
 
+    def test_upload_document_file_too_large(self, client: TestClient):
+        """Test upload with file exceeding size limit."""
+        from src.core.config import get_settings, Settings
+
+        mock_gemini = MagicMock()
+        mock_gemini.get_store.return_value = {
+            "name": "fileSearchStores/test-store",
+            "display_name": "Test Channel",
+        }
+
+        # Create a mock settings with small file size limit
+        mock_settings = Settings(max_file_size_mb=1, google_api_key="test")
+
+        app.dependency_overrides[get_gemini_service] = lambda: mock_gemini
+        app.dependency_overrides[get_settings] = lambda: mock_settings
+
+        # Create content larger than 1MB
+        large_content = b"x" * (2 * 1024 * 1024)  # 2MB
+
+        response = client.post(
+            "/api/v1/documents",
+            params={"channel_id": "fileSearchStores/test-store"},
+            files={"file": ("large.pdf", large_content, "application/pdf")},
+        )
+
+        assert response.status_code == 400
+        assert "too large" in response.json()["detail"]
+
+        app.dependency_overrides.clear()
+
 
 class TestListDocuments:
     """Tests for GET /api/v1/documents."""
