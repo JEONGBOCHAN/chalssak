@@ -96,6 +96,94 @@ class GeminiService:
         response = requests.delete(url)
         return response.status_code == 200
 
+    # ========== Document Operations ==========
+
+    def upload_file(
+        self,
+        store_name: str,
+        file_path: str,
+    ) -> dict[str, Any]:
+        """Upload a file to a File Search Store.
+
+        Args:
+            store_name: The store name/ID
+            file_path: Path to the file to upload
+
+        Returns:
+            Operation information
+        """
+        operation = self._client.file_search_stores.upload_to_file_search_store(
+            file=file_path,
+            file_search_store_name=store_name,
+        )
+        return {
+            "name": operation.name,
+            "done": operation.done,
+        }
+
+    def get_operation_status(self, operation_name: str) -> dict[str, Any]:
+        """Get the status of an upload operation.
+
+        Args:
+            operation_name: The operation name/ID
+
+        Returns:
+            Operation status
+        """
+        try:
+            operation = self._client.operations.get(operation_name)
+            return {
+                "name": operation.name,
+                "done": operation.done,
+            }
+        except Exception:
+            return {"name": operation_name, "done": False, "error": "Not found"}
+
+    def list_store_files(self, store_name: str) -> list[dict[str, Any]]:
+        """List all files in a File Search Store.
+
+        Args:
+            store_name: The store name/ID
+
+        Returns:
+            List of file information
+        """
+        files = []
+        try:
+            # Use REST API to list files in store
+            url = f"https://generativelanguage.googleapis.com/v1beta/{store_name}/files"
+            url += f"?key={self._api_key}"
+            response = requests.get(url)
+            if response.status_code == 200:
+                data = response.json()
+                for file_data in data.get("files", []):
+                    files.append({
+                        "name": file_data.get("name", ""),
+                        "display_name": file_data.get("displayName", ""),
+                        "size_bytes": file_data.get("sizeBytes", 0),
+                        "state": file_data.get("state", ""),
+                    })
+        except Exception:
+            pass
+        return files
+
+    def delete_file(self, file_name: str) -> bool:
+        """Delete a file from File Search Store.
+
+        Args:
+            file_name: The file name/ID
+
+        Returns:
+            True if deleted successfully
+        """
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/{file_name}"
+            url += f"?key={self._api_key}"
+            response = requests.delete(url)
+            return response.status_code == 200
+        except Exception:
+            return False
+
 
 @lru_cache
 def get_gemini_service() -> GeminiService:
