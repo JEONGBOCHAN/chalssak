@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.v1.router import api_router
 from src.core.config import get_settings
 from src.core.database import init_db
+from src.middleware.metrics import MetricsMiddleware
 from src.services.scheduler import get_scheduler
 from src.services.scheduler_jobs import (
     scan_inactive_channels,
@@ -75,6 +76,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Metrics tracking middleware
+app.add_middleware(MetricsMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix=settings.api_v1_prefix)
