@@ -104,6 +104,20 @@ class TestListChannels:
 
         app.dependency_overrides.clear()
 
+    def test_list_channels_api_error(self, client: TestClient):
+        """Test listing channels handles API errors."""
+        mock_gemini = MagicMock()
+        mock_gemini.list_stores.side_effect = Exception("API Error")
+
+        app.dependency_overrides[get_gemini_service] = lambda: mock_gemini
+
+        response = client.get("/api/v1/channels")
+
+        assert response.status_code == 500
+        assert "Failed to list channels" in response.json()["detail"]
+
+        app.dependency_overrides.clear()
+
 
 class TestGetChannel:
     """Tests for GET /api/v1/channels/{channel_id}."""
