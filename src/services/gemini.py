@@ -613,6 +613,256 @@ Generate exactly {count} FAQ items. Return ONLY the JSON array, no other text.""
                 "error": str(e),
             }
 
+    # ========== Citation Operations ==========
+
+    def _extract_detailed_sources(
+        self,
+        grounding_metadata: Any,
+    ) -> list[dict[str, Any]]:
+        """Extract detailed source information from grounding metadata.
+
+        Args:
+            grounding_metadata: Grounding metadata from Gemini response
+
+        Returns:
+            List of detailed source information with location data
+        """
+        sources = []
+
+        if not hasattr(grounding_metadata, "grounding_chunks"):
+            return sources
+
+        for idx, chunk in enumerate(grounding_metadata.grounding_chunks, start=1):
+            source_info = {
+                "index": idx,
+                "source": getattr(chunk, "source", "unknown"),
+                "content": getattr(chunk, "text", ""),
+                "page": None,
+                "start_index": None,
+                "end_index": None,
+            }
+
+            # Try to extract additional location info if available
+            if hasattr(chunk, "page"):
+                source_info["page"] = chunk.page
+            if hasattr(chunk, "start_index"):
+                source_info["start_index"] = chunk.start_index
+            if hasattr(chunk, "end_index"):
+                source_info["end_index"] = chunk.end_index
+
+            # Extract from retrieved_context if available
+            if hasattr(chunk, "retrieved_context"):
+                ctx = chunk.retrieved_context
+                if hasattr(ctx, "uri"):
+                    source_info["source"] = ctx.uri
+                if hasattr(ctx, "title"):
+                    source_info["title"] = ctx.title
+
+            sources.append(source_info)
+
+        return sources
+
+    def _insert_inline_citations(
+        self,
+        response_text: str,
+        sources: list[dict[str, Any]],
+    ) -> str:
+        """Insert inline citation markers into response text.
+
+        Attempts to find where each source's content appears in the response
+        and insert citation markers like [1], [2], etc.
+
+        Args:
+            response_text: The original response text
+            sources: List of source information with content
+
+        Returns:
+            Response text with inline citation markers
+        """
+        if not sources:
+            return response_text
+
+        cited_text = response_text
+        citations_added = set()
+
+        # For each source, try to find relevant parts in the response
+        for source in sources:
+            idx = source.get("index", 0)
+            content = source.get("content", "")
+
+            if not content or idx in citations_added:
+                continue
+
+            # Try to find sentences that might be from this source
+            # Simple approach: look for key phrases from the content
+            words = content.split()
+            if len(words) >= 3:
+                # Try to find a 3-5 word phrase from the source
+                phrase_len = min(5, len(words))
+                search_phrase = " ".join(words[:phrase_len]).lower()
+
+                # Look for this phrase in the response
+                response_lower = cited_text.lower()
+                pos = response_lower.find(search_phrase)
+
+                if pos != -1:
+                    # Find the end of the sentence
+                    sentence_end = pos
+                    for end_char in [".", "!", "?", "\n"]:
+                        end_pos = cited_text.find(end_char, pos)
+                        if end_pos != -1:
+                            sentence_end = max(sentence_end, end_pos)
+                            break
+                    else:
+                        sentence_end = min(pos + len(search_phrase) + 50, len(cited_text))
+
+                    # Insert citation at sentence end
+                    citation_marker = f" [{idx}]"
+                    if citation_marker not in cited_text[pos:sentence_end + 10]:
+                        cited_text = (
+                            cited_text[:sentence_end + 1]
+                            + citation_marker
+                            + cited_text[sentence_end + 1:]
+                        )
+                        citations_added.add(idx)
+
+        # If no citations were added naturally, append them at the end of paragraphs
+        if not citations_added and sources:
+            # Just add all citation numbers at the end
+            all_citations = " ".join([f"[{s.get('index', i+1)}]" for i, s in enumerate(sources)])
+            cited_text = cited_text.rstrip() + " " + all_citations
+
+        return cited_text
+
+    def search_with_citations(
+        self,
+        store_name: str,
+        query: str,
+        model: str = "gemini-2.5-flash",
+    ) -> dict[str, Any]:
+        """Search documents and generate an answer with inline citations.
+
+        Args:
+            store_name: The store name/ID to search in
+            query: The user's question
+            model: The model to use for generation
+
+        Returns:
+            Response with answer, inline citations, and detailed source info
+        """
+        try:
+            response = self._client.models.generate_content(
+                model=model,
+                contents=query,
+                config=types.GenerateContentConfig(
+                    tools=[
+                        types.Tool(
+                            file_search=types.FileSearch(
+                                file_search_store_names=[store_name]
+                            )
+                        )
+                    ]
+                ),
+            )
+
+            response_text = response.text if response.text else ""
+            sources = []
+
+            # Extract detailed source information
+            if hasattr(response, "candidates") and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, "grounding_metadata"):
+                    sources = self._extract_detailed_sources(
+                        candidate.grounding_metadata
+                    )
+
+            # Create response with inline citations
+            cited_response = self._insert_inline_citations(response_text, sources)
+
+            return {
+                "response": cited_response,
+                "response_plain": response_text,
+                "citations": sources,
+            }
+
+        except Exception as e:
+            return {
+                "response": "",
+                "response_plain": "",
+                "citations": [],
+                "error": str(e),
+            }
+
+    def search_with_citations_stream(
+        self,
+        store_name: str,
+        query: str,
+        model: str = "gemini-2.5-flash",
+    ):
+        """Search documents with streaming and inline citations.
+
+        Args:
+            store_name: The store name/ID to search in
+            query: The user's question
+            model: The model to use for generation
+
+        Yields:
+            Chunks of the response, then citations at the end
+        """
+        try:
+            response_stream = self._client.models.generate_content_stream(
+                model=model,
+                contents=query,
+                config=types.GenerateContentConfig(
+                    tools=[
+                        types.Tool(
+                            file_search=types.FileSearch(
+                                file_search_store_names=[store_name]
+                            )
+                        )
+                    ]
+                ),
+            )
+
+            full_response = ""
+            sources = []
+
+            for chunk in response_stream:
+                if chunk.text:
+                    full_response += chunk.text
+                    yield {
+                        "type": "content",
+                        "text": chunk.text,
+                    }
+
+                # Extract grounding metadata from chunks
+                if hasattr(chunk, "candidates") and chunk.candidates:
+                    candidate = chunk.candidates[0]
+                    if hasattr(candidate, "grounding_metadata"):
+                        new_sources = self._extract_detailed_sources(
+                            candidate.grounding_metadata
+                        )
+                        for src in new_sources:
+                            if src not in sources:
+                                sources.append(src)
+
+            # Yield citations with full context
+            if sources:
+                cited_response = self._insert_inline_citations(full_response, sources)
+                yield {
+                    "type": "citations",
+                    "response_with_citations": cited_response,
+                    "citations": sources,
+                }
+
+            yield {"type": "done"}
+
+        except Exception as e:
+            yield {
+                "type": "error",
+                "error": str(e),
+            }
+
     # ========== Summarization Operations ==========
 
     def summarize_channel(
@@ -724,6 +974,199 @@ Focus on the main topic and the most important points from this specific documen
         except Exception as e:
             return {
                 "summary": "",
+                "error": str(e),
+            }
+
+
+    # ========== Timeline Operations ==========
+
+    def generate_timeline(
+        self,
+        store_name: str,
+        max_events: int = 20,
+        model: str = "gemini-2.5-flash",
+    ) -> dict[str, Any]:
+        """Generate a timeline of events from documents in the store.
+
+        Analyzes documents to extract date-based events and organizes
+        them chronologically.
+
+        Args:
+            store_name: The store name/ID to analyze
+            max_events: Maximum number of events to extract (1-50)
+            model: The model to use for generation
+
+        Returns:
+            Dict with 'events' list containing timeline entries
+        """
+        prompt = f"""Analyze all documents in this knowledge base and extract a chronological timeline of events, dates, and milestones.
+
+For each event:
+1. Identify the date or time period (be as specific as possible)
+2. Create a clear, descriptive title
+3. Provide a detailed description of what happened
+4. Note the source document if identifiable
+
+Format your response as a JSON array with objects containing these fields:
+- "date": The date or time period (string, e.g., "2024-01-15", "January 2024", "Q1 2024")
+- "title": A short descriptive title (string)
+- "description": Detailed description of the event (string)
+- "source": Source document name if known (string or null)
+
+Sort events chronologically from earliest to latest.
+Extract up to {max_events} events.
+
+Return ONLY the JSON array, no other text.
+
+Example format:
+[
+  {{"date": "2024-01-15", "title": "Project Launch", "description": "The project was officially launched...", "source": "launch_report.pdf"}},
+  {{"date": "2024-02-01", "title": "First Milestone", "description": "Completed the first phase...", "source": null}}
+]"""
+
+        try:
+            response = self._client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[
+                        types.Tool(
+                            file_search=types.FileSearch(
+                                file_search_store_names=[store_name]
+                            )
+                        )
+                    ],
+                    response_mime_type="application/json",
+                ),
+            )
+
+            # Parse the JSON response
+            import json
+            try:
+                events = json.loads(response.text) if response.text else []
+            except json.JSONDecodeError:
+                # Try to extract JSON from response if it contains extra text
+                text = response.text or ""
+                start = text.find("[")
+                end = text.rfind("]") + 1
+                if start != -1 and end > start:
+                    events = json.loads(text[start:end])
+                else:
+                    events = []
+
+            return {
+                "events": events,
+            }
+
+        except Exception as e:
+            return {
+                "events": [],
+                "error": str(e),
+            }
+
+    # ========== Briefing Operations ==========
+
+    def generate_briefing(
+        self,
+        store_name: str,
+        style: str = "executive",
+        max_sections: int = 5,
+        model: str = "gemini-2.5-flash",
+    ) -> dict[str, Any]:
+        """Generate a briefing document from the content in the store.
+
+        Creates a structured briefing summarizing all documents.
+
+        Args:
+            store_name: The store name/ID to analyze
+            style: 'executive' (concise) or 'detailed' (comprehensive)
+            max_sections: Maximum number of sections (1-10)
+            model: The model to use for generation
+
+        Returns:
+            Dict with briefing structure including title, summary, sections, key_points
+        """
+        if style == "detailed":
+            style_instruction = """Create a comprehensive, detailed briefing document.
+Include thorough analysis, supporting details, and context for each section.
+Sections should be substantial with multiple paragraphs where appropriate."""
+        else:
+            style_instruction = """Create a concise executive briefing.
+Focus on the most critical information. Keep sections brief and actionable.
+Prioritize clarity and quick comprehension over exhaustive detail."""
+
+        prompt = f"""Analyze all documents in this knowledge base and create a professional briefing document.
+
+{style_instruction}
+
+Structure your response as a JSON object with these fields:
+- "title": A descriptive title for the briefing (string)
+- "executive_summary": A brief overview of the entire content (1-2 paragraphs)
+- "sections": An array of up to {max_sections} sections, each with:
+  - "title": Section title (string)
+  - "content": Section content (string, can be multiple paragraphs)
+- "key_points": An array of 3-7 key takeaways or action items (strings)
+
+Return ONLY the JSON object, no other text.
+
+Example format:
+{{
+  "title": "Q1 2024 Project Status Briefing",
+  "executive_summary": "This briefing summarizes...",
+  "sections": [
+    {{"title": "Current Status", "content": "The project is currently..."}},
+    {{"title": "Key Achievements", "content": "Major milestones achieved..."}}
+  ],
+  "key_points": [
+    "Project is on track for Q2 delivery",
+    "Budget utilization at 75%",
+    "Three major risks identified"
+  ]
+}}"""
+
+        try:
+            response = self._client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[
+                        types.Tool(
+                            file_search=types.FileSearch(
+                                file_search_store_names=[store_name]
+                            )
+                        )
+                    ],
+                    response_mime_type="application/json",
+                ),
+            )
+
+            # Parse the JSON response
+            import json
+            try:
+                briefing = json.loads(response.text) if response.text else {}
+            except json.JSONDecodeError:
+                # Try to extract JSON from response if it contains extra text
+                text = response.text or ""
+                start = text.find("{")
+                end = text.rfind("}") + 1
+                if start != -1 and end > start:
+                    briefing = json.loads(text[start:end])
+                else:
+                    briefing = {}
+
+            return {
+                "title": briefing.get("title", "Briefing"),
+                "executive_summary": briefing.get("executive_summary", ""),
+                "sections": briefing.get("sections", []),
+                "key_points": briefing.get("key_points", []),
+            }
+
+        except Exception as e:
+            return {
+                "title": "",
+                "executive_summary": "",
+                "sections": [],
+                "key_points": [],
                 "error": str(e),
             }
 

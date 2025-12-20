@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter
 
-from src.api.v1 import health, channels, documents, chat, capacity, scheduler, admin, notes, faq, summarize, search
+from src.api.v1 import health, channels, documents, chat, capacity, scheduler, admin, notes, faq, summarize, search, citations, favorites, preview, trash, export, timeline
 
 api_router = APIRouter()
 
@@ -12,6 +12,9 @@ api_router.include_router(health.router, tags=["health"])
 # Documents uses /channels/{channel_id}/documents which would be matched by
 # channels' /{channel_id:path} if channels came first
 api_router.include_router(documents.router)
+
+# Export API
+api_router.include_router(export.router)
 
 # Chat API
 api_router.include_router(chat.router)
@@ -36,6 +39,21 @@ api_router.include_router(summarize.router)
 
 # Multi-channel search API
 api_router.include_router(search.router)
+
+# Citations API (inline citations with source navigation)
+api_router.include_router(citations.router)
+
+# Favorites API
+api_router.include_router(favorites.router)
+
+# Document preview API
+api_router.include_router(preview.router)
+
+# Trash API
+api_router.include_router(trash.router)
+
+# Timeline/Briefing generation API
+api_router.include_router(timeline.router)
 
 # Channel CRUD
 api_router.include_router(channels.router)
