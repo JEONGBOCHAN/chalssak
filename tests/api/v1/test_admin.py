@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 class TestGetSystemStats:
     """Tests for GET /api/v1/admin/stats endpoint."""
 
-    def test_get_system_stats_success(self, client_with_db):
+    def test_get_system_stats_success(self, client_with_db, test_db):
         """Test getting system statistics."""
         response = client_with_db.get("/api/v1/admin/stats")
 
@@ -22,7 +22,7 @@ class TestGetSystemStats:
         assert "scheduler" in data
         assert "limits" in data
 
-    def test_channels_stats_structure(self, client_with_db):
+    def test_channels_stats_structure(self, client_with_db, test_db):
         """Test channel statistics structure."""
         response = client_with_db.get("/api/v1/admin/stats")
         data = response.json()
@@ -35,7 +35,7 @@ class TestGetSystemStats:
         assert "inactive" in channels["by_state"]
         assert "over_limit" in channels["by_state"]
 
-    def test_storage_stats_structure(self, client_with_db):
+    def test_storage_stats_structure(self, client_with_db, test_db):
         """Test storage statistics structure."""
         response = client_with_db.get("/api/v1/admin/stats")
         data = response.json()
@@ -47,7 +47,7 @@ class TestGetSystemStats:
         assert "avg_files_per_channel" in storage
         assert "avg_size_per_channel_mb" in storage
 
-    def test_api_stats_structure(self, client_with_db):
+    def test_api_stats_structure(self, client_with_db, test_db):
         """Test API statistics structure."""
         response = client_with_db.get("/api/v1/admin/stats")
         data = response.json()
@@ -58,7 +58,7 @@ class TestGetSystemStats:
         assert "gemini_calls" in api
         assert "error_rate_percent" in api
 
-    def test_scheduler_stats_structure(self, client_with_db):
+    def test_scheduler_stats_structure(self, client_with_db, test_db):
         """Test scheduler statistics structure."""
         response = client_with_db.get("/api/v1/admin/stats")
         data = response.json()
@@ -67,7 +67,7 @@ class TestGetSystemStats:
         assert "running" in scheduler
         assert "job_count" in scheduler
 
-    def test_limits_structure(self, client_with_db):
+    def test_limits_structure(self, client_with_db, test_db):
         """Test limits information structure."""
         response = client_with_db.get("/api/v1/admin/stats")
         data = response.json()
@@ -140,7 +140,7 @@ class TestGetApiMetrics:
         assert "gemini_api_calls" in data
         assert "top_endpoints" in data
 
-    def test_api_metrics_endpoint_structure(self, client_with_db):
+    def test_api_metrics_endpoint_structure(self, client_with_db, test_db):
         """Test top endpoints structure."""
         # Make some API calls first
         client_with_db.get("/api/v1/health")
