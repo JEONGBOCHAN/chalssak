@@ -26,6 +26,12 @@ class ChannelMetadata(Base):
     last_accessed_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     file_count = Column(Integer, default=0)
     total_size_bytes = Column(BigInteger, default=0)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None, index=True)
+
+    @property
+    def is_deleted(self) -> bool:
+        """Check if the channel is soft-deleted."""
+        return self.deleted_at is not None
 
     # Relationship to chat messages
     messages = relationship("ChatMessageDB", back_populates="channel", cascade="all, delete-orphan")
@@ -33,6 +39,8 @@ class ChannelMetadata(Base):
     sessions = relationship("ChatSessionDB", back_populates="channel", cascade="all, delete-orphan")
     # Relationship to notes
     notes = relationship("NoteDB", back_populates="channel", cascade="all, delete-orphan")
+    # Relationship to search history
+    search_history = relationship("SearchHistoryDB", back_populates="channel", cascade="all, delete-orphan")
 
     def touch(self):
         """Update last accessed time."""
@@ -92,6 +100,55 @@ class NoteDB(Base):
     sources_json = Column(Text, default="[]")  # JSON array of sources if from AI
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None, index=True)
 
     # Relationship to channel
     channel = relationship("ChannelMetadata", back_populates="notes")
+
+    @property
+    def is_deleted(self) -> bool:
+        """Check if the note is soft-deleted."""
+        return self.deleted_at is not None
+
+
+class SearchHistoryDB(Base):
+    """Search history for query suggestions and analytics."""
+
+    __tablename__ = "search_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    channel_id = Column(Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False, index=True)
+    query = Column(String(2000), nullable=False)
+    search_count = Column(Integer, default=1)  # Track how many times this query was used
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    last_searched_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+    # Relationship to channel
+    channel = relationship("ChannelMetadata", back_populates="search_history")
+
+
+class FavoriteDB(Base):
+    """Favorite/pin for channels, documents, and notes."""
+
+    __tablename__ = "favorites"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    target_type = Column(String(20), nullable=False, index=True)  # 'channel', 'document', 'note'
+    target_id = Column(String(255), nullable=False, index=True)  # gemini_store_id, file_id, or note_id
+    display_order = Column(Integer, default=0, nullable=False)  # Lower = higher priority
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class DocumentPreviewCacheDB(Base):
+    """Cache for extracted document text content."""
+
+    __tablename__ = "document_preview_cache"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    document_id = Column(String(255), unique=True, nullable=False, index=True)
+    channel_id = Column(String(255), nullable=False, index=True)
+    filename = Column(String(500), nullable=False)
+    content = Column(Text, nullable=False)  # Full extracted text
+    total_characters = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)

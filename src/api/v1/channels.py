@@ -8,10 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from src.models.channel import ChannelCreate, ChannelUpdate, ChannelResponse, ChannelList
+from src.models.favorite import TargetType
 from src.services.gemini import GeminiService, get_gemini_service
 from src.core.database import get_db
 from src.core.rate_limiter import limiter, RateLimits
 from src.services.channel_repository import ChannelRepository
+from src.services.favorite_repository import FavoriteRepository
+from src.services.trash_repository import TrashRepository
+from src.services.cache_service import CacheService, get_cache_service
 
 router = APIRouter(prefix="/channels", tags=["channels"])
 
@@ -28,6 +32,7 @@ def create_channel(
     data: ChannelCreate,
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
     db: Annotated[Session, Depends(get_db)],
+    cache: Annotated[CacheService, Depends(get_cache_service)],
 ) -> ChannelResponse:
     """Create a new channel (Gemini File Search Store).
 
@@ -44,6 +49,9 @@ def create_channel(
             name=data.name,
             description=data.description,
         )
+
+        # Invalidate store list cache
+        cache.invalidate_store_cache()
 
         return ChannelResponse(
             id=store_id,
@@ -69,19 +77,30 @@ def list_channels(
     request: Request,
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
     db: Annotated[Session, Depends(get_db)],
+    cache: Annotated[CacheService, Depends(get_cache_service)],
     limit: Annotated[int | None, Query(description="Maximum number of channels", ge=1, le=100)] = None,
     offset: Annotated[int, Query(description="Number of channels to skip", ge=0)] = 0,
 ) -> ChannelList:
     """List all channels (File Search Stores)."""
     try:
-        stores = gemini.list_stores()
+        # Try to get from cache first
+        stores = cache.get_store_list()
+        if stores is None:
+            stores = gemini.list_stores()
+            cache.set_store_list(stores)
+
         repo = ChannelRepository(db)
+        fav_repo = FavoriteRepository(db)
+        favorited_ids = fav_repo.get_favorited_ids(TargetType.CHANNEL)
 
         channels = []
         for store in stores:
             store_id = store["name"]
             # Get local metadata if exists
             local_meta = repo.get_by_gemini_id(store_id)
+            # Skip if channel is soft-deleted
+            if local_meta and local_meta.is_deleted:
+                continue
             channels.append(
                 ChannelResponse(
                     id=store_id,
@@ -89,8 +108,12 @@ def list_channels(
                     description=local_meta.description if local_meta else None,
                     created_at=local_meta.created_at if local_meta else datetime.now(UTC),
                     file_count=local_meta.file_count if local_meta else 0,
+                    is_favorited=store_id in favorited_ids,
                 )
             )
+
+        # Sort: favorited channels first, then by created_at
+        channels.sort(key=lambda c: (not c.is_favorited, c.created_at))
 
         # Apply pagination
         total = len(channels)
@@ -118,11 +141,34 @@ def get_channel(
     channel_id: str,
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
     db: Annotated[Session, Depends(get_db)],
+    cache: Annotated[CacheService, Depends(get_cache_service)],
 ) -> ChannelResponse:
     """Get a specific channel by its ID.
 
     Note: channel_id should be the full store name (e.g., "fileSearchStores/xxx")
     """
+    repo = ChannelRepository(db)
+    fav_repo = FavoriteRepository(db)
+
+    # Check if channel is soft-deleted
+    local_meta = repo.get_by_gemini_id(channel_id)
+    if local_meta and local_meta.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Channel not found: {channel_id}",
+        )
+
+    # Check if favorited (not cached as it can change frequently)
+    is_favorited = fav_repo.is_favorited(TargetType.CHANNEL, channel_id)
+
+    # Try to get from cache first
+    cached_info = cache.get_channel_info(channel_id)
+    if cached_info:
+        # Update last accessed time in local DB
+        repo.touch(channel_id)
+        cached_info["is_favorited"] = is_favorited
+        return ChannelResponse(**cached_info)
+
     store = gemini.get_store(channel_id)
     if not store:
         raise HTTPException(
@@ -131,16 +177,21 @@ def get_channel(
         )
 
     # Update last accessed time in local DB
-    repo = ChannelRepository(db)
     local_meta = repo.touch(channel_id)
 
-    return ChannelResponse(
+    response = ChannelResponse(
         id=store["name"],
         name=store.get("display_name", ""),
         description=local_meta.description if local_meta else None,
         created_at=local_meta.created_at if local_meta else datetime.now(UTC),
         file_count=local_meta.file_count if local_meta else 0,
+        is_favorited=is_favorited,
     )
+
+    # Cache the response
+    cache.set_channel_info(channel_id, response.model_dump(mode="json"))
+
+    return response
 
 
 @router.put(
@@ -155,6 +206,7 @@ def update_channel(
     data: ChannelUpdate,
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
     db: Annotated[Session, Depends(get_db)],
+    cache: Annotated[CacheService, Depends(get_cache_service)],
 ) -> ChannelResponse:
     """Update a channel's name and/or description.
 
@@ -194,6 +246,10 @@ def update_channel(
             description=data.description,
         )
 
+    # Invalidate channel and store caches
+    cache.invalidate_channel_cache(channel_id)
+    cache.invalidate_store_cache()
+
     return ChannelResponse(
         id=channel_id,
         name=local_meta.name,
@@ -214,10 +270,12 @@ def delete_channel(
     channel_id: str,
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
     db: Annotated[Session, Depends(get_db)],
+    cache: Annotated[CacheService, Depends(get_cache_service)],
 ):
-    """Delete a channel and all its documents.
+    """Delete a channel (moves to trash).
 
-    Note: This operation cannot be undone.
+    The channel can be restored from the trash within 30 days.
+    Use DELETE /trash/channel/{id} for permanent deletion.
     """
     # First check if channel exists
     store = gemini.get_store(channel_id)
@@ -227,15 +285,17 @@ def delete_channel(
             detail=f"Channel not found: {channel_id}",
         )
 
-    success = gemini.delete_store(channel_id, force=True)
-    if not success:
+    # Soft delete (move to trash)
+    trash_repo = TrashRepository(db)
+    channel = trash_repo.soft_delete_channel(channel_id)
+
+    if not channel:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete channel",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Channel metadata not found: {channel_id}",
         )
 
-    # Delete from local DB (also cascades to chat history)
-    repo = ChannelRepository(db)
-    repo.delete(channel_id)
+    # Invalidate all caches related to this channel
+    cache.invalidate_channel(channel_id)
 
     return None

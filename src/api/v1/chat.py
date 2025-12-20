@@ -26,6 +26,8 @@ from src.services.channel_repository import (
     ChatHistoryRepository,
     ChatSessionRepository,
 )
+from src.services.cache_service import CacheService, get_cache_service
+from src.services.search_repository import SearchHistoryRepository
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -59,11 +61,13 @@ def send_message(
     body: ChatRequest,
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
     db: Annotated[Session, Depends(get_db)],
+    cache: Annotated[CacheService, Depends(get_cache_service)],
 ) -> ChatResponse:
     """Send a question and get an AI-generated answer.
 
     The response includes grounding sources from the documents in the channel.
     Supports multi-turn conversations when session_id is provided in the request body.
+    Responses are cached for 1 hour when no session is used.
     """
     # Validate channel exists
     store = gemini.get_store(channel_id)
@@ -102,35 +106,75 @@ def send_message(
     # Get conversation history for context
     conversation_history = _get_conversation_history(chat_repo, session)
 
-    # Search and generate answer with context
-    result = gemini.search_and_answer(
-        channel_id,
-        body.query,
-        conversation_history=conversation_history,
-    )
+    # Check cache for non-session queries
+    cached_response = None
+    use_cache = not body.session_id  # Only cache when no session
 
-    if "error" in result and result["error"]:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate response: {result['error']}",
+    if use_cache:
+        cached_response = cache.get_chat_response(channel_id, body.query)
+
+    if cached_response:
+        # Return cached response
+        sources = [
+            GroundingSource(
+                source=s.get("source", "unknown"),
+                content=s.get("content", ""),
+            )
+            for s in cached_response.get("sources", [])
+        ]
+
+        response = ChatResponse(
+            query=body.query,
+            response=cached_response.get("response", ""),
+            sources=sources,
+            session_id=None,
+            created_at=datetime.now(UTC),
+        )
+    else:
+        # Search and generate answer with context
+        result = gemini.search_and_answer(
+            channel_id,
+            body.query,
+            conversation_history=conversation_history,
         )
 
-    # Convert sources to GroundingSource models
-    sources = [
-        GroundingSource(
-            source=s.get("source", "unknown"),
-            content=s.get("content", ""),
-        )
-        for s in result.get("sources", [])
-    ]
+        if "error" in result and result["error"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate response: {result['error']}",
+            )
 
-    response = ChatResponse(
-        query=body.query,
-        response=result.get("response", ""),
-        sources=sources,
-        session_id=session_id_response,
-        created_at=datetime.now(UTC),
-    )
+        # Convert sources to GroundingSource models
+        sources = [
+            GroundingSource(
+                source=s.get("source", "unknown"),
+                content=s.get("content", ""),
+            )
+            for s in result.get("sources", [])
+        ]
+
+        response = ChatResponse(
+            query=body.query,
+            response=result.get("response", ""),
+            sources=sources,
+            session_id=session_id_response,
+            created_at=datetime.now(UTC),
+        )
+
+        # Cache the response for non-session queries
+        if use_cache:
+            cache.set_chat_response(
+                channel_id,
+                body.query,
+                {
+                    "response": response.response,
+                    "sources": [{"source": s.source, "content": s.content} for s in sources],
+                },
+            )
+
+    # Save to search history
+    search_repo = SearchHistoryRepository(db)
+    search_repo.add_or_update(channel_meta, body.query)
 
     # Add user message
     chat_repo.add_message(
@@ -235,6 +279,10 @@ def send_message_stream(
 
             elif event_type == "done":
                 # Store in DB before signaling done
+                # Save to search history
+                search_repo = SearchHistoryRepository(db)
+                search_repo.add_or_update(channel_meta, body.query)
+
                 # Add user message
                 chat_repo.add_message(
                     channel=channel_meta,

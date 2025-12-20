@@ -23,6 +23,7 @@ from src.models.document import (
 from src.services.gemini import GeminiService, get_gemini_service
 from src.services.crawler import CrawlerService, get_crawler_service
 from src.services.capacity_service import CapacityService, CapacityExceededError
+from src.services.cache_service import CacheService, get_cache_service
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -69,6 +70,7 @@ async def upload_document(
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[Session, Depends(get_db)],
+    cache: Annotated[CacheService, Depends(get_cache_service)],
 ) -> DocumentUploadResponse:
     """Upload a document to a channel.
 
@@ -113,6 +115,10 @@ async def upload_document(
         # Update capacity tracking after successful upload
         capacity_service.update_after_upload(channel_id, actual_size)
 
+        # Invalidate document list and chat caches for this channel
+        cache.invalidate_document_cache(channel_id)
+        cache.invalidate_chat_cache(channel_id)
+
         return DocumentUploadResponse(
             id=operation["name"],
             filename=file.filename or "document",
@@ -153,6 +159,7 @@ def upload_from_url(
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
     crawler: Annotated[CrawlerService, Depends(get_crawler_service)],
     db: Annotated[Session, Depends(get_db)],
+    cache: Annotated[CacheService, Depends(get_cache_service)],
 ) -> DocumentUploadResponse:
     """Crawl a URL and upload the content as a document.
 
@@ -190,6 +197,10 @@ def upload_from_url(
 
         # Update capacity tracking
         capacity_service.update_after_upload(channel_id, file_size)
+
+        # Invalidate document list and chat caches for this channel
+        cache.invalidate_document_cache(channel_id)
+        cache.invalidate_chat_cache(channel_id)
 
         return DocumentUploadResponse(
             id=operation["name"],
@@ -229,6 +240,7 @@ def list_documents(
     request: Request,
     channel_id: Annotated[str, Query(description="Channel ID (e.g., fileSearchStores/xxx)")],
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
+    cache: Annotated[CacheService, Depends(get_cache_service)],
 ) -> DocumentList:
     """List all documents in a channel."""
     # Validate channel exists
@@ -240,6 +252,12 @@ def list_documents(
         )
 
     try:
+        # Try to get from cache first
+        cached_docs = cache.get_document_list(channel_id)
+        if cached_docs is not None:
+            documents = [DocumentResponse(**doc) for doc in cached_docs]
+            return DocumentList(documents=documents, total=len(documents))
+
         files = gemini.list_store_files(channel_id)
         documents = [
             DocumentResponse(
@@ -253,6 +271,13 @@ def list_documents(
             )
             for f in files
         ]
+
+        # Cache the document list
+        cache.set_document_list(
+            channel_id,
+            [doc.model_dump(mode="json") for doc in documents],
+        )
+
         return DocumentList(documents=documents, total=len(documents))
 
     except Exception as e:
@@ -291,10 +316,13 @@ def delete_document(
     request: Request,
     document_id: str,
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
+    cache: Annotated[CacheService, Depends(get_cache_service)],
+    channel_id: Annotated[str | None, Query(description="Channel ID to invalidate cache")] = None,
 ):
     """Delete a document.
 
     Note: document_id should be the full file name (e.g., "files/xxx")
+    Optionally provide channel_id to invalidate related caches.
     """
     success = gemini.delete_file(document_id)
     if not success:
@@ -302,4 +330,10 @@ def delete_document(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete document",
         )
+
+    # Invalidate caches if channel_id is provided
+    if channel_id:
+        cache.invalidate_document_cache(channel_id)
+        cache.invalidate_chat_cache(channel_id)
+
     return None

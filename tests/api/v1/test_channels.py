@@ -2,12 +2,14 @@
 """Tests for Channel CRUD API."""
 
 from unittest.mock import MagicMock, patch
+from datetime import datetime, UTC
 import pytest
 from fastapi.testclient import TestClient
 
 from src.main import app
 from src.services.gemini import get_gemini_service
 from src.core.database import get_db
+from src.models.db_models import ChannelMetadata
 
 
 class TestCreateChannel:
@@ -161,19 +163,34 @@ class TestDeleteChannel:
     """Tests for DELETE /api/v1/channels/{channel_id}."""
 
     def test_delete_channel_success(self, client_with_db: TestClient, test_db):
-        """Test successful channel deletion."""
+        """Test successful channel deletion (soft delete)."""
+        channel_id = "fileSearchStores/store-123"
+
+        # Create channel metadata first (required for soft delete)
+        channel = ChannelMetadata(
+            gemini_store_id=channel_id,
+            name="My Channel",
+            created_at=datetime.now(UTC),
+            last_accessed_at=datetime.now(UTC),
+        )
+        test_db.add(channel)
+        test_db.commit()
+
         mock_gemini = MagicMock()
         mock_gemini.get_store.return_value = {
-            "name": "fileSearchStores/store-123",
+            "name": channel_id,
             "display_name": "My Channel",
         }
-        mock_gemini.delete_store.return_value = True
 
         app.dependency_overrides[get_gemini_service] = lambda: mock_gemini
 
-        response = client_with_db.delete("/api/v1/channels/fileSearchStores/store-123")
+        response = client_with_db.delete(f"/api/v1/channels/{channel_id}")
 
         assert response.status_code == 204
+
+        # Verify channel is soft-deleted
+        test_db.refresh(channel)
+        assert channel.deleted_at is not None
 
         app.dependency_overrides.pop(get_gemini_service, None)
 
@@ -190,21 +207,23 @@ class TestDeleteChannel:
 
         app.dependency_overrides.pop(get_gemini_service, None)
 
-    def test_delete_channel_api_error(self, client_with_db: TestClient, test_db):
-        """Test delete handles API errors."""
+    def test_delete_channel_metadata_not_found(self, client_with_db: TestClient, test_db):
+        """Test delete returns 404 when channel metadata is not in database."""
+        channel_id = "fileSearchStores/store-123"
+
+        # Gemini store exists but no local metadata
         mock_gemini = MagicMock()
         mock_gemini.get_store.return_value = {
-            "name": "fileSearchStores/store-123",
+            "name": channel_id,
             "display_name": "My Channel",
         }
-        mock_gemini.delete_store.return_value = False
 
         app.dependency_overrides[get_gemini_service] = lambda: mock_gemini
 
-        response = client_with_db.delete("/api/v1/channels/fileSearchStores/store-123")
+        response = client_with_db.delete(f"/api/v1/channels/{channel_id}")
 
-        assert response.status_code == 500
-        assert "Failed to delete" in response.json()["detail"]
+        assert response.status_code == 404
+        assert "metadata not found" in response.json()["detail"]
 
         app.dependency_overrides.pop(get_gemini_service, None)
 

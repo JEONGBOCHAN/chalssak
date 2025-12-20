@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Pydantic models for Multi-Channel Search."""
+"""Pydantic models for Search History."""
 
 from datetime import datetime, UTC
 from pydantic import BaseModel, Field
@@ -10,44 +10,33 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-class SearchGroundingSource(BaseModel):
-    """Source information for grounded search response."""
+class SearchHistoryItem(BaseModel):
+    """A single search history entry."""
 
-    source: str = Field(..., description="Source file name")
-    channel_id: str = Field(..., description="Channel ID where this source is from")
-    channel_name: str = Field(default="", description="Channel name for display")
-    page: int | None = Field(default=None, description="Page number if available")
-    content: str = Field(default="", description="Relevant content snippet")
-
-
-class SearchRequest(BaseModel):
-    """Request model for multi-channel search."""
-
-    channel_ids: list[str] = Field(
-        ...,
-        min_length=1,
-        max_length=5,
-        description="List of channel IDs to search (max 5)",
-    )
-    query: str = Field(
-        ...,
-        min_length=1,
-        max_length=2000,
-        description="Search query",
-    )
+    id: int = Field(..., description="Search history ID")
+    channel_id: str = Field(..., description="Channel ID (Gemini store ID)")
+    query: str = Field(..., description="Search query")
+    search_count: int = Field(default=1, description="Number of times this query was searched")
+    created_at: datetime = Field(..., description="First search time")
+    last_searched_at: datetime = Field(..., description="Last search time")
 
 
-class SearchResponse(BaseModel):
-    """Response model for multi-channel search."""
+class SearchHistoryList(BaseModel):
+    """Response model for search history list."""
 
-    query: str = Field(..., description="Original query")
-    response: str = Field(..., description="Generated response")
-    sources: list[SearchGroundingSource] = Field(
-        default_factory=list,
-        description="Grounding sources with channel info",
-    )
-    searched_channels: list[str] = Field(
-        default_factory=list,
-        description="List of channel IDs that were searched",
-    )
-    created_at: datetime = Field(default_factory=_utc_now)
+    history: list[SearchHistoryItem] = Field(default_factory=list)
+    total: int = Field(default=0, description="Total number of history entries")
+
+
+class SearchSuggestion(BaseModel):
+    """A search suggestion."""
+
+    query: str = Field(..., description="Suggested query")
+    search_count: int = Field(default=1, description="Popularity score")
+
+
+class SearchSuggestionList(BaseModel):
+    """Response model for search suggestions."""
+
+    suggestions: list[SearchSuggestion] = Field(default_factory=list)
+    query: str = Field(..., description="Original query prefix")

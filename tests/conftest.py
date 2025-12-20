@@ -8,7 +8,21 @@ from sqlalchemy.pool import StaticPool
 
 from src.main import app
 from src.core.database import Base, get_db
+from src.core.rate_limiter import limiter
 from src.models.db_models import ChannelMetadata
+from src.services.cache_service import reset_cache_service
+
+
+# Disable rate limiting for all tests
+limiter.enabled = False
+
+
+@pytest.fixture(autouse=True)
+def reset_cache():
+    """Reset cache service before each test to ensure test isolation."""
+    reset_cache_service()
+    yield
+    reset_cache_service()
 
 
 @pytest.fixture
