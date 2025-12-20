@@ -23,15 +23,22 @@ POST /channels
 **Request Body:**
 ```json
 {
-  "name": "프로젝트 문서"
+  "name": "프로젝트 문서",
+  "description": "프로젝트 관련 기술 문서 모음"
 }
 ```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| name | string | O | 채널 이름 (1-100자) |
+| description | string | X | 채널 설명 (최대 500자) |
 
 **Response (201 Created):**
 ```json
 {
   "id": "fileSearchStores/abc123",
   "name": "프로젝트 문서",
+  "description": "프로젝트 관련 기술 문서 모음",
   "created_at": "2025-12-20T12:00:00Z",
   "file_count": 0
 }
@@ -40,8 +47,14 @@ POST /channels
 ### 채널 목록 조회
 
 ```
-GET /channels
+GET /channels?limit=10&offset=0
 ```
+
+**Query Parameters:**
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|------|--------|------|
+| limit | integer | X | 전체 | 최대 반환 개수 (1-100) |
+| offset | integer | X | 0 | 건너뛸 개수 |
 
 **Response (200 OK):**
 ```json
@@ -50,6 +63,7 @@ GET /channels
     {
       "id": "fileSearchStores/abc123",
       "name": "프로젝트 문서",
+      "description": "프로젝트 관련 기술 문서 모음",
       "created_at": "2025-12-20T12:00:00Z",
       "file_count": 5
     }
@@ -69,6 +83,7 @@ GET /channels/{channel_id}
 {
   "id": "fileSearchStores/abc123",
   "name": "프로젝트 문서",
+  "description": "프로젝트 관련 기술 문서 모음",
   "created_at": "2025-12-20T12:00:00Z",
   "file_count": 5
 }
@@ -213,8 +228,14 @@ POST /chat?channel_id={channel_id}
 ### 채팅 히스토리 조회
 
 ```
-GET /chat/history?channel_id={channel_id}
+GET /chat/history?channel_id={channel_id}&limit=100
 ```
+
+**Query Parameters:**
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|------|--------|------|
+| channel_id | string | O | - | 채널 ID |
+| limit | integer | X | 100 | 최대 메시지 수 (1-500) |
 
 **Response (200 OK):**
 ```json

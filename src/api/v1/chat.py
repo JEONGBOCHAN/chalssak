@@ -230,7 +230,7 @@ def get_chat_history(
 
     # Get messages from DB
     chat_repo = ChatHistoryRepository(db)
-    db_messages = chat_repo.get_history(channel_meta)
+    db_messages = chat_repo.get_history(channel_meta, limit=limit)
 
     # Convert to ChatMessage models
     messages = [
