@@ -6,6 +6,10 @@ import ChatInput from './ChatInput';
 import ChatMessage from './ChatMessage';
 import TypingIndicator from './TypingIndicator';
 
+// Generate unique message ID
+let messageIdCounter = 0;
+const generateMessageId = () => `msg_${Date.now()}_${++messageIdCounter}`;
+
 interface ChatContainerProps {
   channelId: string;
   onSaveAsNote?: (content: string, sources: ChatSource[]) => void;
@@ -35,7 +39,12 @@ export default function ChatContainer({ channelId, onSaveAsNote }: ChatContainer
     try {
       setError(null);
       const response = await chatApi.getHistory(channelId);
-      setMessages(response.messages || []);
+      // Add IDs to messages from backend if they don't have one
+      const messagesWithIds = (response.messages || []).map((msg) => ({
+        ...msg,
+        id: msg.id || generateMessageId(),
+      }));
+      setMessages(messagesWithIds);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load chat history');
     } finally {
@@ -50,6 +59,7 @@ export default function ChatContainer({ channelId, onSaveAsNote }: ChatContainer
   const handleSendMessage = (content: string) => {
     // Add user message immediately
     const userMessage: ChatMessageType = {
+      id: generateMessageId(),
       role: 'user',
       content,
       created_at: new Date().toISOString(),
@@ -86,6 +96,7 @@ export default function ChatContainer({ channelId, onSaveAsNote }: ChatContainer
             setMessages((prev) => [
               ...prev,
               {
+                id: generateMessageId(),
                 role: 'assistant',
                 content: streamingContentRef.current,
                 sources: streamingSourcesRef.current,
@@ -115,6 +126,7 @@ export default function ChatContainer({ channelId, onSaveAsNote }: ChatContainer
         setMessages((prev) => [
           ...prev,
           {
+            id: generateMessageId(),
             role: 'assistant',
             content: streamingContentRef.current + '\n\n*[Response cancelled]*',
             sources: streamingSourcesRef.current,
@@ -220,9 +232,9 @@ export default function ChatContainer({ channelId, onSaveAsNote }: ChatContainer
           </div>
         ) : (
           <div className="py-4">
-            {messages.map((msg, index) => (
+            {messages.map((msg) => (
               <ChatMessage
-                key={index}
+                key={msg.id}
                 message={msg}
                 onSaveAsNote={onSaveAsNote}
               />
@@ -232,6 +244,7 @@ export default function ChatContainer({ channelId, onSaveAsNote }: ChatContainer
             {isStreaming && streamingContent && (
               <ChatMessage
                 message={{
+                  id: 'streaming',
                   role: 'assistant',
                   content: streamingContent,
                   sources: streamingSources,
@@ -242,6 +255,31 @@ export default function ChatContainer({ channelId, onSaveAsNote }: ChatContainer
 
             {/* Typing indicator when waiting for first chunk */}
             {isStreaming && !streamingContent && <TypingIndicator />}
+
+            {/* Cancel button during streaming */}
+            {isStreaming && (
+              <div className="flex justify-center my-4">
+                <button
+                  onClick={handleCancelStream}
+                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors flex items-center gap-2"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                  Stop generating
+                </button>
+              </div>
+            )}
 
             <div ref={messagesEndRef} />
           </div>

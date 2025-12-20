@@ -9,6 +9,7 @@ export interface ChatResponse {
 }
 
 export interface ChatMessage {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
   sources?: ChatSource[];
@@ -34,6 +35,16 @@ export interface StreamCallbacks {
   onComplete?: () => void;
 }
 
+export interface StreamOptions {
+  timeout?: number; // Timeout in milliseconds (default: 60000)
+  signal?: AbortSignal; // External abort signal
+}
+
+export interface StreamController {
+  abort: () => void;
+  signal: AbortSignal;
+}
+
 export const chatApi = {
   sendMessage: (channelId: string, message: string) => {
     return apiClient.post<ChatResponse>(`/api/v1/channels/${channelId}/chat`, {
@@ -41,70 +52,139 @@ export const chatApi = {
     });
   },
 
-  streamMessage: async (
+  streamMessage: (
     channelId: string,
     message: string,
-    callbacks: StreamCallbacks
-  ): Promise<void> => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/channels/${channelId}/chat/stream`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ message }),
+    callbacks: StreamCallbacks,
+    options: StreamOptions = {}
+  ): StreamController => {
+    const { timeout = 60000 } = options;
+
+    // Create internal AbortController
+    const abortController = new AbortController();
+
+    // Link external signal if provided
+    if (options.signal) {
+      options.signal.addEventListener('abort', () => {
+        abortController.abort();
+      });
+    }
+
+    // Timeout handling
+    let timeoutId: NodeJS.Timeout | null = null;
+    let lastActivityTime = Date.now();
+
+    const resetTimeout = () => {
+      lastActivityTime = Date.now();
+    };
+
+    const checkTimeout = () => {
+      if (Date.now() - lastActivityTime > timeout) {
+        abortController.abort();
+        callbacks.onError?.(new Error('Stream timeout: No response received'));
+        return true;
+      }
+      return false;
+    };
+
+    // Start streaming
+    const startStream = async () => {
+      // Set up periodic timeout check
+      timeoutId = setInterval(() => {
+        if (checkTimeout()) {
+          if (timeoutId) clearInterval(timeoutId);
         }
-      );
+      }, 5000);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/v1/channels/${channelId}/chat/stream`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message }),
+            signal: abortController.signal,
+          }
+        );
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body');
-      }
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-      const decoder = new TextDecoder();
-      let buffer = '';
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body');
+        }
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') {
-              callbacks.onComplete?.();
-              return;
-            }
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.chunk) {
-                callbacks.onChunk(parsed.chunk);
+            // Reset timeout on each chunk
+            resetTimeout();
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') {
+                  callbacks.onComplete?.();
+                  return;
+                }
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.chunk) {
+                    callbacks.onChunk(parsed.chunk);
+                  }
+                  if (parsed.sources) {
+                    callbacks.onSources?.(parsed.sources);
+                  }
+                } catch {
+                  // If not JSON, treat as raw chunk
+                  callbacks.onChunk(data);
+                }
               }
-              if (parsed.sources) {
-                callbacks.onSources?.(parsed.sources);
-              }
-            } catch {
-              // If not JSON, treat as raw chunk
-              callbacks.onChunk(data);
             }
           }
-        }
-      }
 
-      callbacks.onComplete?.();
-    } catch (error) {
-      callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
-    }
+          callbacks.onComplete?.();
+        } finally {
+          // Ensure reader is released
+          reader.releaseLock();
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          // Check if it was a timeout or manual cancel
+          if (Date.now() - lastActivityTime > timeout) {
+            callbacks.onError?.(new Error('Stream timeout: No response received'));
+          } else {
+            callbacks.onError?.(new Error('Stream cancelled'));
+          }
+        } else {
+          callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
+        }
+      } finally {
+        if (timeoutId) clearInterval(timeoutId);
+      }
+    };
+
+    // Start the stream
+    startStream();
+
+    // Return controller for external cancellation
+    return {
+      abort: () => abortController.abort(),
+      signal: abortController.signal,
+    };
   },
 
   getHistory: (channelId: string, limit?: number) => {
