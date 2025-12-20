@@ -8,8 +8,10 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
+from sqlalchemy.orm import Session
 
 from src.core.config import get_settings, Settings
+from src.core.database import get_db
 from src.models.document import (
     DocumentResponse,
     DocumentList,
@@ -19,6 +21,7 @@ from src.models.document import (
 )
 from src.services.gemini import GeminiService, get_gemini_service
 from src.services.crawler import CrawlerService, get_crawler_service
+from src.services.capacity_service import CapacityService, CapacityExceededError
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -62,6 +65,7 @@ async def upload_document(
     file: Annotated[UploadFile, File(description="Document file to upload")],
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
     settings: Annotated[Settings, Depends(get_settings)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> DocumentUploadResponse:
     """Upload a document to a channel.
 
@@ -78,6 +82,17 @@ async def upload_document(
     # Validate file
     validate_file(file, settings)
 
+    # Check capacity limits
+    capacity_service = CapacityService(db)
+    file_size = file.size or 0
+    try:
+        capacity_service.validate_upload(channel_id, file_size)
+    except CapacityExceededError as e:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=str(e),
+        )
+
     # Save to temporary file for upload
     try:
         with tempfile.NamedTemporaryFile(
@@ -87,9 +102,13 @@ async def upload_document(
             content = await file.read()
             tmp.write(content)
             tmp_path = tmp.name
+            actual_size = len(content)
 
         # Upload to Gemini
         operation = gemini.upload_file(channel_id, tmp_path)
+
+        # Update capacity tracking after successful upload
+        capacity_service.update_after_upload(channel_id, actual_size)
 
         return DocumentUploadResponse(
             id=operation["name"],
@@ -98,6 +117,11 @@ async def upload_document(
             message="Upload initiated" if not operation["done"] else "Upload completed",
         )
 
+    except CapacityExceededError as e:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=str(e),
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -123,6 +147,7 @@ def upload_from_url(
     request: UrlUploadRequest,
     gemini: Annotated[GeminiService, Depends(get_gemini_service)],
     crawler: Annotated[CrawlerService, Depends(get_crawler_service)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> DocumentUploadResponse:
     """Crawl a URL and upload the content as a document.
 
@@ -136,6 +161,7 @@ def upload_from_url(
             detail=f"Channel not found: {channel_id}",
         )
 
+    capacity_service = CapacityService(db)
     tmp_path = None
     try:
         # Crawl the URL
@@ -144,8 +170,21 @@ def upload_from_url(
         # Save to temp file
         tmp_path = crawler.save_to_temp_file(result)
 
+        # Get file size and validate capacity
+        file_size = os.path.getsize(tmp_path)
+        try:
+            capacity_service.validate_upload(channel_id, file_size)
+        except CapacityExceededError as e:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=str(e),
+            )
+
         # Upload to Gemini
         operation = gemini.upload_file(channel_id, tmp_path)
+
+        # Update capacity tracking
+        capacity_service.update_after_upload(channel_id, file_size)
 
         return DocumentUploadResponse(
             id=operation["name"],
@@ -154,6 +193,8 @@ def upload_from_url(
             message="URL content uploaded" if not operation["done"] else "Upload completed",
         )
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

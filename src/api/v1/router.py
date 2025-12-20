@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter
 
-from src.api.v1 import health, channels, documents, chat
+from src.api.v1 import health, channels, documents, chat, capacity
 
 api_router = APIRouter()
 
@@ -15,6 +15,9 @@ api_router.include_router(documents.router)
 
 # Chat API
 api_router.include_router(chat.router)
+
+# Capacity API
+api_router.include_router(capacity.router)
 
 # Channel CRUD
 api_router.include_router(channels.router)
