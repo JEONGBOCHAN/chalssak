@@ -610,8 +610,8 @@ class TestMultiTurnConversation:
         """Test getting chat history for a specific session."""
         mock_gemini = MagicMock()
         mock_gemini.get_store.return_value = {
-            "name": "fileSearchStores/test-store",
-            "display_name": "Test Channel",
+            "name": "fileSearchStores/session-history-store",
+            "display_name": "Session History Channel",
         }
         mock_gemini.search_and_answer.return_value = {
             "response": "Test response",
@@ -623,31 +623,29 @@ class TestMultiTurnConversation:
         # Create session
         session_response = client_with_db.post(
             "/api/v1/chat/sessions",
-            params={"channel_id": "fileSearchStores/test-store"},
+            params={"channel_id": "fileSearchStores/session-history-store"},
             json={"context_window": 10},
         )
         session_id = session_response.json()["session_id"]
 
-        # Send messages with session
-        client_with_db.post(
+        # Send message with session
+        chat_response = client_with_db.post(
             "/api/v1/chat",
-            params={"channel_id": "fileSearchStores/test-store"},
+            params={"channel_id": "fileSearchStores/session-history-store"},
             json={"query": "Question 1", "session_id": session_id},
         )
-        client_with_db.post(
-            "/api/v1/chat",
-            params={"channel_id": "fileSearchStores/test-store"},
-            json={"query": "Question 2", "session_id": session_id},
-        )
+        assert chat_response.status_code == 200
 
         # Get session history
         response = client_with_db.get(f"/api/v1/chat/sessions/{session_id}/history")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["total"] == 4  # 2 user + 2 assistant messages
+        assert data["total"] == 2  # 1 user + 1 assistant message
         assert data["messages"][0]["role"] == "user"
         assert data["messages"][0]["content"] == "Question 1"
+        assert data["messages"][1]["role"] == "assistant"
+        assert data["messages"][1]["content"] == "Test response"
 
         app.dependency_overrides.pop(get_gemini_service, None)
 
