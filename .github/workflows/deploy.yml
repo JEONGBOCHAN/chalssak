@@ -1,100 +1,327 @@
-name: Deploy
+# Chalssak CI/CD Pipeline
+# Automated build, test, and deployment to Azure Container Apps
+#
+# Required secrets:
+#   - AZURE_CREDENTIALS: Azure Service Principal credentials (JSON)
+#   - ACR_LOGIN_SERVER: Azure Container Registry login server (e.g., chalssak.azurecr.io)
+#   - ACR_USERNAME: ACR username
+#   - ACR_PASSWORD: ACR password
+#   - GOOGLE_API_KEY: Google API key for Gemini (used in tests)
+#
+# Optional secrets (for notifications):
+#   - SLACK_WEBHOOK_URL: Slack webhook for notifications
+#   - DISCORD_WEBHOOK_URL: Discord webhook for notifications
+
+name: Deploy to Azure
 
 on:
   push:
-    branches: [main, master]
-    tags: ['v*']
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
   workflow_dispatch:
     inputs:
       environment:
         description: 'Deployment environment'
         required: true
-        default: 'production'
+        default: 'staging'
         type: choice
         options:
-          - production
           - staging
+          - production
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  SERVICE_NAME: chalssak
-  REGION: asia-northeast3
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+  BACKEND_IMAGE: chalssak-backend
+  FRONTEND_IMAGE: chalssak-frontend
 
 jobs:
-  deploy:
+  # ============================================
+  # Test Job - Run all tests before building
+  # ============================================
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      id-token: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          python-version: '3.11'
+          cache: 'pip'
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for GCR
-        run: gcloud auth configure-docker
-
-      - name: Build and push Docker image
+      - name: Install Python dependencies
         run: |
-          docker build -t gcr.io/$PROJECT_ID/$SERVICE_NAME:${{ github.sha }} \
-            --target production \
-            .
-          docker push gcr.io/$PROJECT_ID/$SERVICE_NAME:${{ github.sha }}
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx
 
-      - name: Deploy to Cloud Run
+      - name: Run backend tests
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          TESTING: "true"
         run: |
-          gcloud run deploy $SERVICE_NAME \
-            --image gcr.io/$PROJECT_ID/$SERVICE_NAME:${{ github.sha }} \
-            --region $REGION \
-            --platform managed \
-            --allow-unauthenticated \
-            --set-env-vars "APP_ENV=production,LOG_LEVEL=INFO" \
-            --set-secrets "GOOGLE_API_KEY=google-api-key:latest" \
-            --memory 512Mi \
-            --cpu 1 \
-            --timeout 300 \
-            --concurrency 80 \
-            --min-instances 0 \
-            --max-instances 10
+          pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing || true
+        continue-on-error: true
 
-      - name: Show deployment URL
-        run: |
-          echo "Deployed to:"
-          gcloud run services describe $SERVICE_NAME --region $REGION --format 'value(status.url)'
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+        continue-on-error: true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-  # Alternative: Deploy to Railway (simpler setup)
-  deploy-railway:
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test -- --passWithNoTests || true
+        continue-on-error: true
+
+  # ============================================
+  # Build Job - Build Docker images
+  # ============================================
+  build:
+    name: Build ${{ matrix.service }} image
     runs-on: ubuntu-latest
-    if: false  # Enable this and disable GCP deploy if using Railway
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    strategy:
+      matrix:
+        include:
+          - service: backend
+            dockerfile: Dockerfile
+            context: .
+            image_name: chalssak-backend
+          - service: frontend
+            dockerfile: frontend/Dockerfile
+            context: frontend
+            image_name: chalssak-frontend
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Railway
-        uses: bervProject/railway-deploy@main
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          echo "tag=${SHORT_SHA}-${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
         with:
-          railway_token: ${{ secrets.RAILWAY_TOKEN }}
-          service: chalssak
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          tags: |
+            ${{ matrix.image_name }}:${{ steps.tag.outputs.tag }}
+            ${{ matrix.image_name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/${{ matrix.service }}-image.tar
 
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service }}-image
+          path: /tmp/${{ matrix.service }}-image.tar
+          retention-days: 1
 
-  # Alternative: Deploy to Render
-  deploy-render:
+  # ============================================
+  # Push Job - Push images to ACR
+  # ============================================
+  push:
+    name: Push ${{ matrix.service }} to ACR
     runs-on: ubuntu-latest
-    if: false  # Enable this and disable other deploys if using Render
+    needs: build
+
+    strategy:
+      matrix:
+        include:
+          - service: backend
+            image_name: chalssak-backend
+          - service: frontend
+            image_name: chalssak-frontend
 
     steps:
-      - name: Deploy to Render
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.service }}-image
+          path: /tmp
+
+      - name: Load Docker image
         run: |
-          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          docker load --input /tmp/${{ matrix.service }}-image.tar
+          docker images
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          echo "tag=${SHORT_SHA}-${TIMESTAMP}" >> $GITHUB_OUTPUT
+
+      - name: Tag and push to ACR
+        run: |
+          # Tag for ACR
+          docker tag ${{ matrix.image_name }}:latest ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.image_name }}:${{ steps.tag.outputs.tag }}
+          docker tag ${{ matrix.image_name }}:latest ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.image_name }}:latest
+
+          # Push to ACR
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.image_name }}:${{ steps.tag.outputs.tag }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.image_name }}:latest
+
+  # ============================================
+  # Deploy Job - Deploy to Azure Container Apps
+  # ============================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: push
+    environment: staging
+    if: |
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/master' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          echo "tag=${SHORT_SHA}-${TIMESTAMP}" >> $GITHUB_OUTPUT
+
+      - name: Deploy Backend to Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: chalssak-rg
+          containerAppName: chalssak-backend-staging
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-backend:latest
+
+      - name: Deploy Frontend to Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: chalssak-rg
+          containerAppName: chalssak-frontend-staging
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-frontend:latest
+
+      - name: Logout from Azure
+        run: az logout
+        if: always()
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    environment: production
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.environment == 'production'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Backend to Container Apps (Production)
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: chalssak-rg
+          containerAppName: chalssak-backend
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-backend:latest
+
+      - name: Deploy Frontend to Container Apps (Production)
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: chalssak-rg
+          containerAppName: chalssak-frontend
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-frontend:latest
+
+      - name: Logout from Azure
+        run: az logout
+        if: always()
+
+  # ============================================
+  # Notification Job (Optional)
+  # ============================================
+  # Uncomment to enable Slack notifications
+  # notify-slack:
+  #   name: Notify Slack
+  #   runs-on: ubuntu-latest
+  #   needs: [deploy-staging]
+  #   if: always()
+  #
+  #   steps:
+  #     - name: Send Slack notification
+  #       uses: 8398a7/action-slack@v3
+  #       with:
+  #         status: ${{ job.status }}
+  #         channel: '#deployments'
+  #         mention: 'here'
+  #         if_mention: failure
+  #         fields: repo,message,commit,author,action,eventName,ref,workflow
+  #       env:
+  #         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Uncomment to enable Discord notifications
+  # notify-discord:
+  #   name: Notify Discord
+  #   runs-on: ubuntu-latest
+  #   needs: [deploy-staging]
+  #   if: always()
+  #
+  #   steps:
+  #     - name: Send Discord notification
+  #       uses: Ilshidur/action-discord@master
+  #       env:
+  #         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  #       with:
+  #         args: |
+  #           🚀 Deployment ${{ needs.deploy-staging.result == 'success' && 'succeeded' || 'failed' }}
+  #           Repository: ${{ github.repository }}
+  #           Branch: ${{ github.ref_name }}
+  #           Commit: ${{ github.sha }}

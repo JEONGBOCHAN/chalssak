@@ -95,6 +95,16 @@ class Settings(BaseSettings):
             return ["*"]
         return [origin.strip() for origin in self.cors_origins.split(",")]
 
+    @property
+    def is_postgresql(self) -> bool:
+        """Check if using PostgreSQL database."""
+        return self.database_url.startswith("postgresql://") or self.database_url.startswith("postgresql+psycopg2://")
+
+    @property
+    def is_sqlite(self) -> bool:
+        """Check if using SQLite database."""
+        return self.database_url.startswith("sqlite:///")
+
 
 @lru_cache
 def get_settings() -> Settings:
