@@ -10,6 +10,7 @@ Google NotebookLM 클론 코딩 프로젝트
 | [api-spec.md](./api-spec.md) | API 엔드포인트 명세 |
 | [setup.md](./setup.md) | 환경 설정 및 실행 방법 |
 | [development.md](./development.md) | 개발 가이드 및 컨벤션 |
+| [deployment.md](./deployment.md) | Azure 배포 가이드 (Docker) |
 
 ## 빠른 링크
 
