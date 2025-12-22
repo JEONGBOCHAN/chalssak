@@ -76,3 +76,6 @@ logs
 tmp
 temp
 *.tmp
+
+# Database files (SQLite)
+data/*.db
