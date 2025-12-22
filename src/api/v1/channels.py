@@ -291,15 +291,19 @@ def delete_channel(
             detail=f"Channel not found: {channel_id}",
         )
 
-    # Soft delete (move to trash)
+    # Soft delete (move to trash) - create metadata if it doesn't exist
     trash_repo = TrashRepository(db)
     channel = trash_repo.soft_delete_channel(channel_id)
 
     if not channel:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Channel metadata not found: {channel_id}",
+        # Metadata doesn't exist, create it first then soft delete
+        repo = ChannelRepository(db)
+        repo.create(
+            gemini_store_id=channel_id,
+            name=store.get("display_name", ""),
+            description=None,
         )
+        channel = trash_repo.soft_delete_channel(channel_id)
 
     # Invalidate all caches related to this channel
     cache.invalidate_channel(channel_id)
