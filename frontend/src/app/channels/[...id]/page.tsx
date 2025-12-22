@@ -214,7 +214,8 @@ function channelPageReducer(state: ChannelPageState, action: ChannelPageAction):
 export default function ChannelDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const channelId = params.id as string;
+  // Catch-all route returns array of path segments, join them back with '/'
+  const channelId = Array.isArray(params.id) ? params.id.join('/') : (params.id as string);
 
   const [state, dispatch] = useReducer(channelPageReducer, initialState);
   const requestIdRef = useRef(0);

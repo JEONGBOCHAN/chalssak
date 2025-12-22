@@ -53,7 +53,7 @@ export default function Sidebar({ channels = [], isOpen = true, onClose }: Sideb
             </p>
           ) : (
             channels.map((channel) => {
-              const isActive = pathname === `/channels/${channel.id}`;
+              const isActive = pathname === `/channels/${channel.id}` || pathname?.startsWith(`/channels/${channel.id}/`);
               return (
                 <Link
                   key={channel.id}
