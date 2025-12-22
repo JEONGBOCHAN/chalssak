@@ -145,8 +145,7 @@ jobs:
             ${{ matrix.image_name }}:${{ steps.tag.outputs.tag }}
             ${{ matrix.image_name }}:latest
           build-args: ${{ matrix.build_args }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
           outputs: type=docker,dest=/tmp/${{ matrix.service }}-image.tar
 
       - name: Upload Docker image artifact
