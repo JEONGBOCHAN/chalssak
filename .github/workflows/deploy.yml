@@ -130,8 +130,7 @@ jobs:
         id: tag
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          echo "tag=${SHORT_SHA}-${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
@@ -194,8 +193,7 @@ jobs:
         id: tag
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          echo "tag=${SHORT_SHA}-${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Tag and push to ACR
         run: |
@@ -233,22 +231,21 @@ jobs:
         id: tag
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          echo "tag=${SHORT_SHA}-${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Deploy Backend to Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
           resourceGroup: chalssak-rg
           containerAppName: chalssak-backend-staging
-          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-backend:latest
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-backend:${{ steps.tag.outputs.tag }}
 
       - name: Deploy Frontend to Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
           resourceGroup: chalssak-rg
           containerAppName: chalssak-frontend-staging
-          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-frontend:latest
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-frontend:${{ steps.tag.outputs.tag }}
 
       - name: Logout from Azure
         run: az logout
