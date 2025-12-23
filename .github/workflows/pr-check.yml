@@ -1,4 +1,4 @@
-# Chalssak PR Validation Workflow
+# Docuchat PR Validation Workflow
 # Runs lint, type check, and unit tests on pull requests
 #
 # This workflow is designed to be fast and provide early feedback on PRs.

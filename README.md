@@ -24,7 +24,7 @@
 
 **Docuchat** is an intelligent document assistant that lets you upload documents, ask questions, and get accurate answers grounded in your content. Built with Retrieval-Augmented Generation (RAG) and LangGraph-powered agentic workflows.
 
-**Try it now**: [Live Demo](https://chalssak-frontend-staging.graysmoke-543aab46.eastus.azurecontainerapps.io)
+**Try it now**: [Live Demo](https://docuchat-frontend-staging.YOUR-SUBDOMAIN.eastus.azurecontainerapps.io) <!-- TODO: Update URL after Azure redeployment -->
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

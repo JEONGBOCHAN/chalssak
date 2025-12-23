@@ -1,7 +1,7 @@
 {
-  "name": "chalssak-e2e",
+  "name": "docuchat-e2e",
   "version": "1.0.0",
-  "description": "E2E tests for Chalssak API",
+  "description": "E2E tests for Docuchat API",
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",

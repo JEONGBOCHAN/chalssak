@@ -70,6 +70,6 @@ jobs:
           context: .
           target: production
           push: false
-          tags: chalssak:test
+          tags: docuchat:test
           cache-from: type=gha
           cache-to: type=gha,mode=max

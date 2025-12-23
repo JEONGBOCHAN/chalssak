@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     app_env: Environment = Environment.DEVELOPMENT
 
     # App
-    app_name: str = "Chalssak"
+    app_name: str = "Docuchat"
     app_version: str = "0.1.0"
     debug: bool = False
 
@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     allowed_extensions: list[str] = [".pdf", ".txt", ".docx"]
 
     # Database
-    database_url: str = "sqlite:///./data/chalssak.db"
+    database_url: str = "sqlite:///./data/docuchat.db"
 
     # Channel Lifecycle
     channel_inactive_days: int = 90  # Days before channel is considered inactive

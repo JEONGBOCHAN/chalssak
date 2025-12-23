@@ -1,5 +1,5 @@
 # ============================================
-# Chalssak - Docker Compose Configuration
+# Docuchat - Docker Compose Configuration
 # ============================================
 # Local development environment with:
 # - Backend (FastAPI)
@@ -19,20 +19,20 @@ services:
   # ==========================================
   db:
     image: postgres:16-alpine
-    container_name: chalssak-db
+    container_name: docuchat-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-chalssak}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chalssak_password}
-      POSTGRES_DB: ${POSTGRES_DB:-chalssak}
+      POSTGRES_USER: ${POSTGRES_USER:-docuchat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docuchat_password}
+      POSTGRES_DB: ${POSTGRES_DB:-docuchat}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - chalssak-network
+      - docuchat-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chalssak} -d ${POSTGRES_DB:-chalssak}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docuchat} -d ${POSTGRES_DB:-docuchat}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -46,11 +46,11 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
-    container_name: chalssak-backend
+    container_name: docuchat-backend
     restart: unless-stopped
     environment:
       # Database
-      DATABASE_URL: postgresql://${POSTGRES_USER:-chalssak}:${POSTGRES_PASSWORD:-chalssak_password}@db:5432/${POSTGRES_DB:-chalssak}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-docuchat}:${POSTGRES_PASSWORD:-docuchat_password}@db:5432/${POSTGRES_DB:-docuchat}
       # API Keys
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       # Environment
@@ -70,7 +70,7 @@ services:
       - ./src:/app/src:ro
       - ./data:/app/data
     networks:
-      - chalssak-network
+      - docuchat-network
     depends_on:
       db:
         condition: service_healthy
@@ -90,7 +90,7 @@ services:
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-    container_name: chalssak-frontend
+    container_name: docuchat-frontend
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -100,7 +100,7 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - chalssak-network
+      - docuchat-network
     depends_on:
       backend:
         condition: service_healthy
@@ -119,10 +119,10 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    container_name: chalssak-backend-prod
+    container_name: docuchat-backend-prod
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-chalssak}:${POSTGRES_PASSWORD:-chalssak_password}@db:5432/${POSTGRES_DB:-chalssak}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-docuchat}:${POSTGRES_PASSWORD:-docuchat_password}@db:5432/${POSTGRES_DB:-docuchat}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       APP_ENV: production
       DEBUG: "false"
@@ -135,7 +135,7 @@ services:
     volumes:
       - ./data:/app/data
     networks:
-      - chalssak-network
+      - docuchat-network
     depends_on:
       db:
         condition: service_healthy
@@ -156,16 +156,16 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
-    container_name: chalssak-test
+    container_name: docuchat-test
     environment:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       APP_ENV: test
-      DATABASE_URL: postgresql://${POSTGRES_USER:-chalssak}:${POSTGRES_PASSWORD:-chalssak_password}@db:5432/${POSTGRES_DB:-chalssak}_test
+      DATABASE_URL: postgresql://${POSTGRES_USER:-docuchat}:${POSTGRES_PASSWORD:-docuchat_password}@db:5432/${POSTGRES_DB:-docuchat}_test
     volumes:
       - ./src:/app/src:ro
       - ./tests:/app/tests:ro
     networks:
-      - chalssak-network
+      - docuchat-network
     depends_on:
       db:
         condition: service_healthy
@@ -177,13 +177,13 @@ services:
 # Networks
 # ==========================================
 networks:
-  chalssak-network:
+  docuchat-network:
     driver: bridge
-    name: chalssak-network
+    name: docuchat-network
 
 # ==========================================
 # Volumes
 # ==========================================
 volumes:
   postgres_data:
-    name: chalssak-postgres-data
+    name: docuchat-postgres-data

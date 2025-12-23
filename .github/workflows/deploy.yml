@@ -3,7 +3,7 @@
 #
 # Required secrets:
 #   - AZURE_CREDENTIALS: Azure Service Principal credentials (JSON)
-#   - ACR_LOGIN_SERVER: Azure Container Registry login server (e.g., chalssak.azurecr.io)
+#   - ACR_LOGIN_SERVER: Azure Container Registry login server (e.g., docuchat.azurecr.io)
 #   - ACR_USERNAME: ACR username
 #   - ACR_PASSWORD: ACR password
 #   - GOOGLE_API_KEY: Google API key for Gemini (used in tests)
@@ -36,8 +36,8 @@ on:
 
 env:
   ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
-  BACKEND_IMAGE: chalssak-backend
-  FRONTEND_IMAGE: chalssak-frontend
+  BACKEND_IMAGE: docuchat-backend
+  FRONTEND_IMAGE: docuchat-frontend
 
 jobs:
   # ============================================
@@ -109,15 +109,15 @@ jobs:
           - service: backend
             dockerfile: Dockerfile
             context: .
-            image_name: chalssak-backend
+            image_name: docuchat-backend
             target: production
             build_args: ""
           - service: frontend
             dockerfile: frontend/Dockerfile
             context: frontend
-            image_name: chalssak-frontend
+            image_name: docuchat-frontend
             target: runner
-            build_args: "NEXT_PUBLIC_API_URL=https://chalssak-backend-staging.graysmoke-543aab46.eastus.azurecontainerapps.io"
+            build_args: "NEXT_PUBLIC_API_URL=${{ vars.BACKEND_URL }}"
 
     steps:
       - name: Checkout code
@@ -166,9 +166,9 @@ jobs:
       matrix:
         include:
           - service: backend
-            image_name: chalssak-backend
+            image_name: docuchat-backend
           - service: frontend
-            image_name: chalssak-frontend
+            image_name: docuchat-frontend
 
     steps:
       - name: Download Docker image artifact
@@ -236,16 +236,16 @@ jobs:
       - name: Deploy Backend to Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
-          resourceGroup: chalssak-rg
-          containerAppName: chalssak-backend-staging
-          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-backend:${{ steps.tag.outputs.tag }}
+          resourceGroup: docuchat-rg
+          containerAppName: docuchat-backend-staging
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/docuchat-backend:${{ steps.tag.outputs.tag }}
 
       - name: Deploy Frontend to Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
-          resourceGroup: chalssak-rg
-          containerAppName: chalssak-frontend-staging
-          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-frontend:${{ steps.tag.outputs.tag }}
+          resourceGroup: docuchat-rg
+          containerAppName: docuchat-frontend-staging
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/docuchat-frontend:${{ steps.tag.outputs.tag }}
 
       - name: Logout from Azure
         run: az logout
@@ -272,16 +272,16 @@ jobs:
       - name: Deploy Backend to Container Apps (Production)
         uses: azure/container-apps-deploy-action@v1
         with:
-          resourceGroup: chalssak-rg
-          containerAppName: chalssak-backend
-          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-backend:latest
+          resourceGroup: docuchat-rg
+          containerAppName: docuchat-backend
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/docuchat-backend:latest
 
       - name: Deploy Frontend to Container Apps (Production)
         uses: azure/container-apps-deploy-action@v1
         with:
-          resourceGroup: chalssak-rg
-          containerAppName: chalssak-frontend
-          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/chalssak-frontend:latest
+          resourceGroup: docuchat-rg
+          containerAppName: docuchat-frontend
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/docuchat-frontend:latest
 
       - name: Logout from Azure
         run: az logout
