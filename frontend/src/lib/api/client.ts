@@ -1,5 +1,5 @@
 /**
- * API Client for Chalssak Backend
+ * API Client for Docuchat Backend
  */
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';

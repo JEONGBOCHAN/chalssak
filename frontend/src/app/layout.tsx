@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chalssak - AI-Powered Document Assistant",
+  title: "Docuchat - AI-Powered Document Assistant",
   description: "Upload documents, chat with AI, and get intelligent answers grounded in your content.",
   keywords: ["AI", "documents", "chat", "knowledge base", "NotebookLM"],
 };

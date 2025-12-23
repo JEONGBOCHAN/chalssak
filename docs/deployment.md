@@ -2,7 +2,7 @@
 
 ## 개요
 
-Chalssak 프로젝트를 Azure에 Docker 기반으로 배포하기 위한 가이드입니다.
+Docuchat 프로젝트를 Azure에 Docker 기반으로 배포하기 위한 가이드입니다.
 
 ## 배포 아키텍처
 
@@ -24,8 +24,8 @@ Chalssak 프로젝트를 Azure에 Docker 기반으로 배포하기 위한 가이
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │              Azure Container Registry                 │   │
-│  │    chalssak.azurecr.io/frontend:latest               │   │
-│  │    chalssak.azurecr.io/backend:latest                │   │
+│  │    docuchat.azurecr.io/frontend:latest               │   │
+│  │    docuchat.azurecr.io/backend:latest                │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -56,12 +56,12 @@ Chalssak 프로젝트를 Azure에 Docker 기반으로 배포하기 위한 가이
 
 | 리소스 | 이름 (예시) | SKU/Tier | 예상 월 비용 |
 |--------|-------------|----------|--------------|
-| Resource Group | rg-chalssak | - | 무료 |
-| Container Registry | chalssak | Basic | ~$5 |
-| Container Apps Environment | cae-chalssak | Consumption | 사용량 기반 |
+| Resource Group | rg-docuchat | - | 무료 |
+| Container Registry | docuchat | Basic | ~$5 |
+| Container Apps Environment | cae-docuchat | Consumption | 사용량 기반 |
 | Container App (Backend) | ca-backend | - | ~$10-20 |
 | Container App (Frontend) | ca-frontend | - | ~$5-10 |
-| PostgreSQL Flexible Server | psql-chalssak | Burstable B1ms | ~$15 |
+| PostgreSQL Flexible Server | psql-docuchat | Burstable B1ms | ~$15 |
 
 **예상 총 비용: $35-50/월** (트래픽에 따라 변동)
 
@@ -121,7 +121,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://user:pass@db:5432/chalssak
+      - DATABASE_URL=postgresql://user:pass@db:5432/docuchat
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
     depends_on:
       - db
@@ -139,9 +139,9 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=chalssak
-      - POSTGRES_PASSWORD=chalssak
-      - POSTGRES_DB=chalssak
+      - POSTGRES_USER=docuchat
+      - POSTGRES_PASSWORD=docuchat
+      - POSTGRES_DB=docuchat
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -192,20 +192,20 @@ volumes:
 
 1. **리소스 그룹 생성**
    ```bash
-   az group create --name rg-chalssak --location koreacentral
+   az group create --name rg-docuchat --location koreacentral
    ```
 
 2. **Container Registry 생성** (CHA-68)
    ```bash
-   az acr create --name chalssak --resource-group rg-chalssak --sku Basic
-   az acr login --name chalssak
+   az acr create --name docuchat --resource-group rg-docuchat --sku Basic
+   az acr login --name docuchat
    ```
 
 3. **PostgreSQL 생성**
    ```bash
    az postgres flexible-server create \
-     --name psql-chalssak \
-     --resource-group rg-chalssak \
+     --name psql-docuchat \
+     --resource-group rg-docuchat \
      --location koreacentral \
      --admin-user adminuser \
      --admin-password <password> \
@@ -216,8 +216,8 @@ volumes:
 4. **Container Apps Environment 생성**
    ```bash
    az containerapp env create \
-     --name cae-chalssak \
-     --resource-group rg-chalssak \
+     --name cae-docuchat \
+     --resource-group rg-docuchat \
      --location koreacentral
    ```
 
@@ -226,16 +226,16 @@ volumes:
 1. **이미지 빌드**
    ```bash
    # 백엔드
-   docker build -t chalssak.azurecr.io/backend:latest .
+   docker build -t docuchat.azurecr.io/backend:latest .
 
    # 프론트엔드
-   docker build -t chalssak.azurecr.io/frontend:latest ./frontend
+   docker build -t docuchat.azurecr.io/frontend:latest ./frontend
    ```
 
 2. **이미지 푸시**
    ```bash
-   docker push chalssak.azurecr.io/backend:latest
-   docker push chalssak.azurecr.io/frontend:latest
+   docker push docuchat.azurecr.io/backend:latest
+   docker push docuchat.azurecr.io/frontend:latest
    ```
 
 ### Phase 4: Container Apps 배포 (CHA-69)
@@ -244,12 +244,12 @@ volumes:
    ```bash
    az containerapp create \
      --name ca-backend \
-     --resource-group rg-chalssak \
-     --environment cae-chalssak \
-     --image chalssak.azurecr.io/backend:latest \
+     --resource-group rg-docuchat \
+     --environment cae-docuchat \
+     --image docuchat.azurecr.io/backend:latest \
      --target-port 8000 \
      --ingress external \
-     --registry-server chalssak.azurecr.io \
+     --registry-server docuchat.azurecr.io \
      --env-vars GOOGLE_API_KEY=<key> DATABASE_URL=<url>
    ```
 
@@ -257,12 +257,12 @@ volumes:
    ```bash
    az containerapp create \
      --name ca-frontend \
-     --resource-group rg-chalssak \
-     --environment cae-chalssak \
-     --image chalssak.azurecr.io/frontend:latest \
+     --resource-group rg-docuchat \
+     --environment cae-docuchat \
+     --image docuchat.azurecr.io/frontend:latest \
      --target-port 3000 \
      --ingress external \
-     --registry-server chalssak.azurecr.io \
+     --registry-server docuchat.azurecr.io \
      --env-vars NEXT_PUBLIC_API_URL=https://ca-backend.<env>.azurecontainerapps.io
    ```
 
@@ -289,24 +289,24 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Login to ACR
-        run: az acr login --name chalssak
+        run: az acr login --name docuchat
 
       - name: Build and push backend
         run: |
-          docker build -t chalssak.azurecr.io/backend:${{ github.sha }} .
-          docker push chalssak.azurecr.io/backend:${{ github.sha }}
+          docker build -t docuchat.azurecr.io/backend:${{ github.sha }} .
+          docker push docuchat.azurecr.io/backend:${{ github.sha }}
 
       - name: Build and push frontend
         run: |
-          docker build -t chalssak.azurecr.io/frontend:${{ github.sha }} ./frontend
-          docker push chalssak.azurecr.io/frontend:${{ github.sha }}
+          docker build -t docuchat.azurecr.io/frontend:${{ github.sha }} ./frontend
+          docker push docuchat.azurecr.io/frontend:${{ github.sha }}
 
       - name: Deploy to Container Apps
         run: |
-          az containerapp update --name ca-backend --resource-group rg-chalssak \
-            --image chalssak.azurecr.io/backend:${{ github.sha }}
-          az containerapp update --name ca-frontend --resource-group rg-chalssak \
-            --image chalssak.azurecr.io/frontend:${{ github.sha }}
+          az containerapp update --name ca-backend --resource-group rg-docuchat \
+            --image docuchat.azurecr.io/backend:${{ github.sha }}
+          az containerapp update --name ca-frontend --resource-group rg-docuchat \
+            --image docuchat.azurecr.io/frontend:${{ github.sha }}
 ```
 
 ## 보안 고려사항
@@ -351,7 +351,7 @@ CORS_ORIGINS = [
 
 | 문제 | 원인 | 해결 |
 |------|------|------|
-| 이미지 푸시 실패 | ACR 로그인 만료 | `az acr login --name chalssak` |
+| 이미지 푸시 실패 | ACR 로그인 만료 | `az acr login --name docuchat` |
 | 컨테이너 시작 실패 | 환경 변수 누락 | Container App 환경 변수 확인 |
 | DB 연결 실패 | 방화벽 규칙 | PostgreSQL 방화벽에 Container Apps IP 추가 |
 | CORS 오류 | 도메인 미등록 | CORS_ORIGINS에 프론트엔드 도메인 추가 |
@@ -360,10 +360,10 @@ CORS_ORIGINS = [
 
 ```bash
 # Container App 로그
-az containerapp logs show --name ca-backend --resource-group rg-chalssak
+az containerapp logs show --name ca-backend --resource-group rg-docuchat
 
 # 실시간 로그 스트리밍
-az containerapp logs show --name ca-backend --resource-group rg-chalssak --follow
+az containerapp logs show --name ca-backend --resource-group rg-docuchat --follow
 ```
 
 ## 관련 이슈

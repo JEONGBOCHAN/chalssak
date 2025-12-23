@@ -131,7 +131,7 @@ Get-Content result.txt
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-$projectPath = "C:\Users\wjd86\t\study\chalssak"
+$projectPath = "C:\Users\wjd86\t\study\docuchat"
 $startTime = Get-Date
 
 # 병렬로 두 개의 Claude 프로세스 시작
@@ -346,7 +346,7 @@ Job 8: Count files in tests folder recursively => 100
 # parallel_multi.ps1
 # 사용법: powershell.exe -ExecutionPolicy Bypass -File parallel_multi.ps1
 
-$projectPath = "C:\Users\wjd86\t\study\chalssak"
+$projectPath = "C:\Users\wjd86\t\study\docuchat"
 $startTime = Get-Date
 
 # 작업 목록 정의 (영어 프롬프트 권장)

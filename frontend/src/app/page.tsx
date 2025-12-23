@@ -7,7 +7,7 @@ export default function Home() {
       <header className="container mx-auto px-6 py-4">
         <nav className="flex items-center justify-between">
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            Chalssak
+            Docuchat
           </div>
           <Link
             href="/channels"
@@ -125,7 +125,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="container mx-auto px-6 py-8 border-t border-gray-100 dark:border-gray-800">
         <div className="text-center text-gray-500 dark:text-gray-400">
-          <p>&copy; 2025 Chalssak. Open source project.</p>
+          <p>&copy; 2025 Docuchat. Open source project.</p>
         </div>
       </footer>
     </div>

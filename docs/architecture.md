@@ -86,7 +86,7 @@
 ## 디렉토리 구조
 
 ```
-chalssak/
+docuchat/
 ├── docs/                    # 개발 문서
 │   ├── README.md
 │   ├── architecture.md      # 이 문서

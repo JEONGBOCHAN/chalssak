@@ -31,7 +31,7 @@ class TestSentrySetup:
         with patch("src.core.sentry.get_settings") as mock_settings:
             mock_settings.return_value.sentry_dsn = "https://key@sentry.io/123"
             mock_settings.return_value.app_env.value = "test"
-            mock_settings.return_value.app_name = "Chalssak"
+            mock_settings.return_value.app_name = "Docuchat"
             mock_settings.return_value.app_version = "0.1.0"
             mock_settings.return_value.sentry_traces_sample_rate = 0.1
             mock_settings.return_value.sentry_profiles_sample_rate = 0.1

@@ -7,7 +7,7 @@
 | ID | CHA-73 |
 | 제목 | Upgrade Gemini model from 2.5 Flash to 3 Flash |
 | 라벨 | Feature |
-| Linear URL | https://linear.app/chalssak/issue/CHA-73 |
+| Linear URL | https://linear.app/docuchat/issue/CHA-73 |
 
 ## 실행 결과
 

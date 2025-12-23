@@ -1,4 +1,4 @@
-# Chalssak 개발 문서
+# Docuchat 개발 문서
 
 Google NotebookLM 클론 코딩 프로젝트
 
@@ -14,5 +14,5 @@ Google NotebookLM 클론 코딩 프로젝트
 
 ## 빠른 링크
 
-- [Linear 프로젝트](https://linear.app/chalssak/project/노트북-lm-클론-코딩-a0f53b8e2e10)
+- [Linear 프로젝트](https://linear.app/docuchat/project/노트북-lm-클론-코딩-a0f53b8e2e10)
 - [Gemini File Search API 문서](https://ai.google.dev/gemini-api/docs/file-search)

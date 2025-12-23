@@ -70,7 +70,7 @@ az account show
 
 ```bash
 # 변수 설정
-RESOURCE_GROUP="rg-chalssak"
+RESOURCE_GROUP="rg-docuchat"
 LOCATION="koreacentral"
 
 # 리소스 그룹 생성
@@ -86,7 +86,7 @@ az group show --name $RESOURCE_GROUP --output table
 ```
 Location       Name
 -------------  -----------
-koreacentral   rg-chalssak
+koreacentral   rg-docuchat
 ```
 
 ### 사용 가능한 위치 목록
@@ -119,8 +119,8 @@ az account list-locations --query "[?contains(name, 'korea')]" --output table
 
 ```bash
 # 변수 설정
-ACR_NAME="chalssak"
-RESOURCE_GROUP="rg-chalssak"
+ACR_NAME="docuchat"
+RESOURCE_GROUP="rg-docuchat"
 SKU="Basic"
 
 # ACR 이름 가용성 확인 (전역 고유해야 함)
@@ -141,7 +141,7 @@ az acr show --name $ACR_NAME --output table
 ```
 NAME       RESOURCE GROUP   LOCATION       SKU    LOGIN SERVER           CREATION DATE
 ---------  ---------------  -------------  -----  ---------------------  -------------------------
-chalssak   rg-chalssak      koreacentral   Basic  chalssak.azurecr.io    2025-12-21T00:00:00+00:00
+docuchat   rg-docuchat      koreacentral   Basic  docuchat.azurecr.io    2025-12-21T00:00:00+00:00
 ```
 
 ### 중요 정보 확인
@@ -149,7 +149,7 @@ chalssak   rg-chalssak      koreacentral   Basic  chalssak.azurecr.io    2025-12
 ```bash
 # 로그인 서버 URL 확인
 az acr show --name $ACR_NAME --query loginServer --output tsv
-# 출력: chalssak.azurecr.io
+# 출력: docuchat.azurecr.io
 
 # 관리자 자격 증명 확인 (개발 환경용)
 az acr credential show --name $ACR_NAME
@@ -163,7 +163,7 @@ az acr credential show --name $ACR_NAME
 
 ```bash
 # ACR에 로그인 (Azure 자격 증명 사용)
-az acr login --name chalssak
+az acr login --name docuchat
 
 # 성공 메시지
 # Login Succeeded
@@ -173,19 +173,19 @@ az acr login --name chalssak
 
 ```bash
 # 관리자 자격 증명 가져오기
-ACR_NAME="chalssak"
+ACR_NAME="docuchat"
 USERNAME=$(az acr credential show --name $ACR_NAME --query username --output tsv)
 PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" --output tsv)
 
 # Docker 로그인
-docker login chalssak.azurecr.io --username $USERNAME --password $PASSWORD
+docker login docuchat.azurecr.io --username $USERNAME --password $PASSWORD
 ```
 
 ### 로그인 확인
 
 ```bash
 # Docker 설정 파일에서 확인
-cat ~/.docker/config.json | grep chalssak
+cat ~/.docker/config.json | grep docuchat
 ```
 
 ---
@@ -196,19 +196,19 @@ cat ~/.docker/config.json | grep chalssak
 
 ```bash
 # 변수 설정
-ACR_NAME="chalssak"
-ACR_LOGIN_SERVER="chalssak.azurecr.io"
+ACR_NAME="docuchat"
+ACR_LOGIN_SERVER="docuchat.azurecr.io"
 IMAGE_TAG="v1.0.0"
 
 # 백엔드 이미지 빌드
-docker build -t $ACR_LOGIN_SERVER/chalssak-backend:$IMAGE_TAG -f Dockerfile .
+docker build -t $ACR_LOGIN_SERVER/docuchat-backend:$IMAGE_TAG -f Dockerfile .
 
 # 프론트엔드 이미지 빌드
-docker build -t $ACR_LOGIN_SERVER/chalssak-frontend:$IMAGE_TAG -f frontend/Dockerfile ./frontend
+docker build -t $ACR_LOGIN_SERVER/docuchat-frontend:$IMAGE_TAG -f frontend/Dockerfile ./frontend
 
 # ACR에 푸시
-docker push $ACR_LOGIN_SERVER/chalssak-backend:$IMAGE_TAG
-docker push $ACR_LOGIN_SERVER/chalssak-frontend:$IMAGE_TAG
+docker push $ACR_LOGIN_SERVER/docuchat-backend:$IMAGE_TAG
+docker push $ACR_LOGIN_SERVER/docuchat-frontend:$IMAGE_TAG
 ```
 
 ### ACR Tasks로 원격 빌드 (권장)
@@ -219,14 +219,14 @@ docker push $ACR_LOGIN_SERVER/chalssak-frontend:$IMAGE_TAG
 # 백엔드 이미지를 ACR에서 직접 빌드
 az acr build \
   --registry $ACR_NAME \
-  --image chalssak-backend:$IMAGE_TAG \
+  --image docuchat-backend:$IMAGE_TAG \
   --file Dockerfile \
   .
 
 # 프론트엔드 이미지를 ACR에서 직접 빌드
 az acr build \
   --registry $ACR_NAME \
-  --image chalssak-frontend:$IMAGE_TAG \
+  --image docuchat-frontend:$IMAGE_TAG \
   --file frontend/Dockerfile \
   ./frontend
 ```
@@ -238,7 +238,7 @@ az acr build \
 az acr repository list --name $ACR_NAME --output table
 
 # 특정 이미지의 태그 목록
-az acr repository show-tags --name $ACR_NAME --repository chalssak-backend --output table
+az acr repository show-tags --name $ACR_NAME --repository docuchat-backend --output table
 ```
 
 ---
@@ -251,8 +251,8 @@ CI/CD 파이프라인에서 ACR에 접근하려면 서비스 주체(Service Prin
 
 ```bash
 # 변수 설정
-ACR_NAME="chalssak"
-SERVICE_PRINCIPAL_NAME="sp-chalssak-github"
+ACR_NAME="docuchat"
+SERVICE_PRINCIPAL_NAME="sp-docuchat-github"
 
 # ACR 리소스 ID 가져오기
 ACR_REGISTRY_ID=$(az acr show --name $ACR_NAME --query "id" --output tsv)
@@ -288,7 +288,7 @@ GitHub Repository → Settings → Secrets and variables → Actions에서 다�
 | Secret Name | Value |
 |-------------|-------|
 | `AZURE_CREDENTIALS` | 위 JSON 전체 출력 |
-| `ACR_LOGIN_SERVER` | `chalssak.azurecr.io` |
+| `ACR_LOGIN_SERVER` | `docuchat.azurecr.io` |
 | `ACR_USERNAME` | `<clientId>` |
 | `ACR_PASSWORD` | `<clientSecret>` |
 
@@ -325,13 +325,13 @@ jobs:
 
       - name: Build and push backend image
         run: |
-          docker build -t $ACR_LOGIN_SERVER/chalssak-backend:${{ github.sha }} .
-          docker push $ACR_LOGIN_SERVER/chalssak-backend:${{ github.sha }}
+          docker build -t $ACR_LOGIN_SERVER/docuchat-backend:${{ github.sha }} .
+          docker push $ACR_LOGIN_SERVER/docuchat-backend:${{ github.sha }}
 
       - name: Build and push frontend image
         run: |
-          docker build -t $ACR_LOGIN_SERVER/chalssak-frontend:${{ github.sha }} -f frontend/Dockerfile ./frontend
-          docker push $ACR_LOGIN_SERVER/chalssak-frontend:${{ github.sha }}
+          docker build -t $ACR_LOGIN_SERVER/docuchat-frontend:${{ github.sha }} -f frontend/Dockerfile ./frontend
+          docker push $ACR_LOGIN_SERVER/docuchat-frontend:${{ github.sha }}
 ```
 
 ---
@@ -347,7 +347,7 @@ Azure CLI 대신 Azure Portal을 사용하는 경우:
 3. "리소스 그룹" 클릭 → "+ 만들기"
 4. 설정:
    - 구독: 본인 구독 선택
-   - 리소스 그룹: `rg-chalssak`
+   - 리소스 그룹: `rg-docuchat`
    - 지역: `Korea Central`
 5. "검토 + 만들기" → "만들기"
 
@@ -357,8 +357,8 @@ Azure CLI 대신 Azure Portal을 사용하는 경우:
 2. "Container Registries" 클릭 → "+ 만들기"
 3. 기본 사항:
    - 구독: 본인 구독 선택
-   - 리소스 그룹: `rg-chalssak`
-   - 레지스트리 이름: `chalssak` (전역 고유)
+   - 리소스 그룹: `rg-docuchat`
+   - 레지스트리 이름: `docuchat` (전역 고유)
    - 위치: `Korea Central`
    - SKU: `Basic`
 4. "검토 + 만들기" → "만들기"
@@ -385,7 +385,7 @@ Error: The registry name is already in use
 **해결:**
 ```bash
 # 다른 이름 시도
-az acr check-name --name chalssak2024
+az acr check-name --name docuchat2024
 ```
 
 #### 2. Docker 로그인 실패
@@ -397,10 +397,10 @@ Error: unauthorized: authentication required
 **해결:**
 ```bash
 # ACR 로그인 재시도
-az acr login --name chalssak
+az acr login --name docuchat
 
 # 또는 관리자 자격 증명 확인
-az acr credential show --name chalssak
+az acr credential show --name docuchat
 ```
 
 #### 3. 이미지 푸시 권한 없음
@@ -412,7 +412,7 @@ Error: denied: requested access to the resource is denied
 **해결:**
 ```bash
 # 역할 확인
-az role assignment list --scope /subscriptions/<SUB_ID>/resourceGroups/rg-chalssak/providers/Microsoft.ContainerRegistry/registries/chalssak
+az role assignment list --scope /subscriptions/<SUB_ID>/resourceGroups/rg-docuchat/providers/Microsoft.ContainerRegistry/registries/docuchat
 
 # acrpush 역할 추가
 az role assignment create \
@@ -432,7 +432,7 @@ Error: Build timed out
 # 타임아웃 시간 증가 (초 단위)
 az acr build \
   --registry $ACR_NAME \
-  --image chalssak-backend:latest \
+  --image docuchat-backend:latest \
   --timeout 3600 \
   .
 ```
@@ -441,16 +441,16 @@ az acr build \
 
 ```bash
 # ACR 상태 확인
-az acr show --name chalssak --query provisioningState
+az acr show --name docuchat --query provisioningState
 
 # ACR 사용량 확인
-az acr show-usage --name chalssak --output table
+az acr show-usage --name docuchat --output table
 
 # ACR 로그 확인
-az acr task logs --name chalssak
+az acr task logs --name docuchat
 
 # 이미지 삭제 (저장소 정리)
-az acr repository delete --name chalssak --repository chalssak-backend --yes
+az acr repository delete --name docuchat --repository docuchat-backend --yes
 ```
 
 ---

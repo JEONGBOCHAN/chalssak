@@ -33,7 +33,7 @@ export default function Header({ onMenuClick, showMenuButton = false }: HeaderPr
           </button>
         )}
         <Link href="/" className="font-bold text-xl text-gray-900 dark:text-white">
-          Chalssak
+          Docuchat
         </Link>
       </div>
 

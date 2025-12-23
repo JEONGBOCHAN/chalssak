@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Comprehensive End-to-End tests for all Chalssak features.
+"""Comprehensive End-to-End tests for all Docuchat features.
 
 Tests cover the complete user journey for all implemented features:
 - Channel management (CRUD)

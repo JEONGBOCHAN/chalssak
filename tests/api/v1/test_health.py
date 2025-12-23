@@ -9,7 +9,7 @@ def test_health_check(client):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert data["app_name"] == "Chalssak"
+    assert data["app_name"] == "Docuchat"
     assert "version" in data
 
 
@@ -20,4 +20,4 @@ def test_root_endpoint(client):
     assert response.status_code == 200
     data = response.json()
     assert "message" in data
-    assert "Chalssak" in data["message"]
+    assert "Docuchat" in data["message"]

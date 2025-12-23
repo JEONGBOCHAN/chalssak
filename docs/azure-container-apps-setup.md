@@ -33,11 +33,11 @@ Azure Container Apps는 서버리스 컨테이너 플랫폼으로, Kubernetes의
 ```
                     ┌─────────────────────────────────────────────┐
                     │       Azure Container Apps Environment      │
-                    │              (cae-chalssak)                 │
+                    │              (cae-docuchat)                 │
                     │                                             │
 ┌─────────┐        │  ┌─────────────────┐  ┌─────────────────┐  │        ┌─────────────────┐
 │ 사용자   │───────▶│  │ Frontend App    │  │ Backend App     │──│──────▶ │ PostgreSQL      │
-│         │        │  │ (ca-chalssak-   │  │ (ca-chalssak-   │  │        │ Flexible Server │
+│         │        │  │ (ca-docuchat-   │  │ (ca-docuchat-   │  │        │ Flexible Server │
 │         │◀───────│  │  frontend)      │──│  backend)       │  │        │                 │
 └─────────┘        │  │ Port: 3000      │  │ Port: 8000      │  │        └─────────────────┘
                     │  └─────────────────┘  └─────────────────┘  │
@@ -48,7 +48,7 @@ Azure Container Apps는 서버리스 컨테이너 플랫폼으로, Kubernetes의
                               ┌─────────────────┐
                               │ Azure Container │
                               │ Registry (ACR)  │
-                              │ chalssak.       │
+                              │ docuchat.       │
                               │ azurecr.io      │
                               └─────────────────┘
 ```
@@ -57,12 +57,12 @@ Azure Container Apps는 서버리스 컨테이너 플랫폼으로, Kubernetes의
 
 | 리소스 유형 | 이름 | 설명 |
 |------------|------|------|
-| 리소스 그룹 | `rg-chalssak` | 모든 리소스 그룹화 |
-| Container Apps 환경 | `cae-chalssak` | 컨테이너 앱 실행 환경 |
-| 백엔드 앱 | `ca-chalssak-backend` | FastAPI 백엔드 |
-| 프론트엔드 앱 | `ca-chalssak-frontend` | Next.js 프론트엔드 |
-| PostgreSQL 서버 | `psql-chalssak` | 데이터베이스 서버 |
-| Log Analytics | `log-chalssak` | 로그 수집 |
+| 리소스 그룹 | `rg-docuchat` | 모든 리소스 그룹화 |
+| Container Apps 환경 | `cae-docuchat` | 컨테이너 앱 실행 환경 |
+| 백엔드 앱 | `ca-docuchat-backend` | FastAPI 백엔드 |
+| 프론트엔드 앱 | `ca-docuchat-frontend` | Next.js 프론트엔드 |
+| PostgreSQL 서버 | `psql-docuchat` | 데이터베이스 서버 |
+| Log Analytics | `log-docuchat` | 로그 수집 |
 
 ---
 
@@ -74,8 +74,8 @@ Azure Container Apps는 서버리스 컨테이너 플랫폼으로, Kubernetes의
 |------|------|----------|
 | Azure 구독 | 활성 Azure 구독 | Azure Portal 로그인 후 확인 |
 | Azure CLI | v2.50.0 이상 | `az --version` |
-| ACR 설정 완료 | CHA-68 완료 | `az acr show --name chalssak` |
-| Docker 이미지 | ACR에 푸시됨 | `az acr repository list --name chalssak` |
+| ACR 설정 완료 | CHA-68 완료 | `az acr show --name docuchat` |
+| Docker 이미지 | ACR에 푸시됨 | `az acr repository list --name docuchat` |
 
 ### Azure CLI 확장 설치
 
@@ -111,11 +111,11 @@ Container Apps 환경은 여러 Container App이 공유하는 보안 경계입�
 
 ```bash
 # 공통 변수
-RESOURCE_GROUP="rg-chalssak"
+RESOURCE_GROUP="rg-docuchat"
 LOCATION="koreacentral"
-ENVIRONMENT_NAME="cae-chalssak"
-LOG_ANALYTICS_WORKSPACE="log-chalssak"
-ACR_NAME="chalssak"
+ENVIRONMENT_NAME="cae-docuchat"
+LOG_ANALYTICS_WORKSPACE="log-docuchat"
+ACR_NAME="docuchat"
 ```
 
 ### 3.2 Log Analytics 워크스페이스 생성
@@ -163,7 +163,7 @@ az containerapp env show \
 ```
 Location       Name           ProvisioningState    ResourceGroup
 -------------  -------------  -------------------  -------------
-koreacentral   cae-chalssak   Succeeded           rg-chalssak
+koreacentral   cae-docuchat   Succeeded           rg-docuchat
 ```
 
 ---
@@ -184,8 +184,8 @@ koreacentral   cae-chalssak   Succeeded           rg-chalssak
 
 ```bash
 # 변수 설정
-POSTGRES_SERVER_NAME="psql-chalssak"
-POSTGRES_ADMIN_USER="chalssak_admin"
+POSTGRES_SERVER_NAME="psql-docuchat"
+POSTGRES_ADMIN_USER="docuchat_admin"
 POSTGRES_ADMIN_PASSWORD="<강력한_비밀번호_입력>"  # 최소 8자, 대소문자+숫자+특수문자
 POSTGRES_SKU="Standard_B1ms"
 POSTGRES_TIER="Burstable"
@@ -215,7 +215,7 @@ az postgres flexible-server create \
 az postgres flexible-server db create \
   --resource-group $RESOURCE_GROUP \
   --server-name $POSTGRES_SERVER_NAME \
-  --database-name chalssak_db
+  --database-name docuchat_db
 
 # 데이터베이스 목록 확인
 az postgres flexible-server db list \
@@ -256,10 +256,10 @@ POSTGRES_HOST=$(az postgres flexible-server show \
   --output tsv)
 
 echo "PostgreSQL Host: $POSTGRES_HOST"
-# 출력 예: psql-chalssak.postgres.database.azure.com
+# 출력 예: psql-docuchat.postgres.database.azure.com
 
 # 연결 문자열 형식
-echo "DATABASE_URL=postgresql://${POSTGRES_ADMIN_USER}:${POSTGRES_ADMIN_PASSWORD}@${POSTGRES_HOST}:5432/chalssak_db?sslmode=require"
+echo "DATABASE_URL=postgresql://${POSTGRES_ADMIN_USER}:${POSTGRES_ADMIN_PASSWORD}@${POSTGRES_HOST}:5432/docuchat_db?sslmode=require"
 ```
 
 ---
@@ -281,8 +281,8 @@ ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].val
 
 ```bash
 # 변수 설정
-BACKEND_APP_NAME="ca-chalssak-backend"
-BACKEND_IMAGE="chalssak.azurecr.io/chalssak-backend:v1.0.0"
+BACKEND_APP_NAME="ca-docuchat-backend"
+BACKEND_IMAGE="docuchat.azurecr.io/docuchat-backend:v1.0.0"
 
 # 백엔드 Container App 생성
 az containerapp create \
@@ -313,7 +313,7 @@ az containerapp secret set \
   --name $BACKEND_APP_NAME \
   --resource-group $RESOURCE_GROUP \
   --secrets \
-    "database-url=postgresql://${POSTGRES_ADMIN_USER}:${POSTGRES_ADMIN_PASSWORD}@${POSTGRES_HOST}:5432/chalssak_db?sslmode=require" \
+    "database-url=postgresql://${POSTGRES_ADMIN_USER}:${POSTGRES_ADMIN_PASSWORD}@${POSTGRES_HOST}:5432/docuchat_db?sslmode=require" \
     "google-api-key=<YOUR_GOOGLE_API_KEY>"
 ```
 
@@ -338,8 +338,8 @@ echo "Backend URL: https://$BACKEND_URL"
 
 ```bash
 # 변수 설정
-FRONTEND_APP_NAME="ca-chalssak-frontend"
-FRONTEND_IMAGE="chalssak.azurecr.io/chalssak-frontend:v1.0.0"
+FRONTEND_APP_NAME="ca-docuchat-frontend"
+FRONTEND_IMAGE="docuchat.azurecr.io/docuchat-frontend:v1.0.0"
 
 # 프론트엔드 Container App 생성
 az containerapp create \
@@ -391,7 +391,7 @@ echo "Frontend URL: https://$FRONTEND_URL"
 
 | 변수명 | 설명 | 예시 값 |
 |--------|------|---------|
-| `NEXT_PUBLIC_API_URL` | 백엔드 API URL | `https://ca-chalssak-backend.xxx.azurecontainerapps.io` |
+| `NEXT_PUBLIC_API_URL` | 백엔드 API URL | `https://ca-docuchat-backend.xxx.azurecontainerapps.io` |
 
 ### 7.2 환경 변수 업데이트
 
@@ -476,7 +476,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://ca-chalssak-frontend.xxx.azurecontainerapps.io",
+        "https://ca-docuchat-frontend.xxx.azurecontainerapps.io",
         # 개발 환경
         "http://localhost:3000",
     ],
@@ -493,13 +493,13 @@ app.add_middleware(
 az containerapp hostname add \
   --name $FRONTEND_APP_NAME \
   --resource-group $RESOURCE_GROUP \
-  --hostname "app.chalssak.com"
+  --hostname "app.docuchat.com"
 
 # 관리형 인증서 바인딩
 az containerapp hostname bind \
   --name $FRONTEND_APP_NAME \
   --resource-group $RESOURCE_GROUP \
-  --hostname "app.chalssak.com" \
+  --hostname "app.docuchat.com" \
   --environment $ENVIRONMENT_NAME \
   --validation-method CNAME
 ```
@@ -554,7 +554,7 @@ properties:
   template:
     containers:
       - name: backend
-        image: chalssak.azurecr.io/chalssak-backend:v1.0.0
+        image: docuchat.azurecr.io/docuchat-backend:v1.0.0
         probes:
           - type: Startup
             httpGet:
@@ -661,14 +661,14 @@ az containerapp update \
 3. "Container Apps" → "+ 만들기"
 4. **기본 사항:**
    - 구독: 본인 구독 선택
-   - 리소스 그룹: `rg-chalssak`
-   - Container App 이름: `ca-chalssak-backend`
+   - 리소스 그룹: `rg-docuchat`
+   - Container App 이름: `ca-docuchat-backend`
    - 지역: `Korea Central`
-   - Container Apps 환경: "새로 만들기" → `cae-chalssak`
+   - Container Apps 환경: "새로 만들기" → `cae-docuchat`
 5. **컨테이너:**
    - 이미지 원본: Azure Container Registry
-   - 레지스트리: `chalssak.azurecr.io`
-   - 이미지: `chalssak-backend`
+   - 레지스트리: `docuchat.azurecr.io`
+   - 이미지: `docuchat-backend`
    - 태그: `v1.0.0`
 6. **Ingress:**
    - Ingress: 사용
@@ -697,7 +697,7 @@ az containerapp update \
 ```kql
 // 최근 로그 조회
 ContainerAppConsoleLogs_CL
-| where ContainerAppName_s == "ca-chalssak-backend"
+| where ContainerAppName_s == "ca-docuchat-backend"
 | order by TimeGenerated desc
 | take 100
 ```
@@ -860,7 +860,7 @@ az containerapp revision restart \
 az containerapp update \
   --name $BACKEND_APP_NAME \
   --resource-group $RESOURCE_GROUP \
-  --image chalssak.azurecr.io/chalssak-backend:v1.0.1
+  --image docuchat.azurecr.io/docuchat-backend:v1.0.1
 ```
 
 ### 13.3 로그 분석 쿼리 (KQL)
@@ -870,20 +870,20 @@ Log Analytics에서 사용:
 ```kql
 // 오류 로그만 조회
 ContainerAppConsoleLogs_CL
-| where ContainerAppName_s == "ca-chalssak-backend"
+| where ContainerAppName_s == "ca-docuchat-backend"
 | where Log_s contains "error" or Log_s contains "Error" or Log_s contains "ERROR"
 | order by TimeGenerated desc
 | take 50
 
 // 시간대별 요청 수
 ContainerAppConsoleLogs_CL
-| where ContainerAppName_s == "ca-chalssak-backend"
+| where ContainerAppName_s == "ca-docuchat-backend"
 | summarize RequestCount = count() by bin(TimeGenerated, 1h)
 | render timechart
 
 // 컨테이너 재시작 이벤트
 ContainerAppSystemLogs_CL
-| where ContainerAppName_s == "ca-chalssak-backend"
+| where ContainerAppName_s == "ca-docuchat-backend"
 | where Reason_s == "Pulled" or Reason_s == "Started"
 | order by TimeGenerated desc
 ```

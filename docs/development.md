@@ -176,4 +176,4 @@ CHA-{번호}: {제목}
 - [Gemini File Search API 문서](https://ai.google.dev/gemini-api/docs/file-search)
 - [FastAPI 문서](https://fastapi.tiangolo.com/)
 - [LangGraph 문서](https://langchain-ai.github.io/langgraph/)
-- [Linear 프로젝트](https://linear.app/chalssak/project/노트북-lm-클론-코딩-a0f53b8e2e10)
+- [Linear 프로젝트](https://linear.app/docuchat/project/노트북-lm-클론-코딩-a0f53b8e2e10)

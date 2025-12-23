@@ -1,5 +1,5 @@
 /**
- * Common API types for Chalssak
+ * Common API types for Docuchat
  */
 
 /**

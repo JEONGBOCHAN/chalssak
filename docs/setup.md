@@ -12,7 +12,7 @@
 
 ```bash
 git clone <repository-url>
-cd chalssak
+cd docuchat
 ```
 
 ## 2. 가상환경 생성 (권장)
@@ -67,7 +67,7 @@ uvicorn src.main:app --reload
 ## 디렉토리 구조
 
 ```
-chalssak/
+docuchat/
 ├── .env                 # 환경변수 (Git 제외)
 ├── .gitignore           # Git 제외 목록
 ├── requirements.txt     # Python 의존성
