@@ -229,11 +229,10 @@ docuchat/
 
 Detailed documentation is available in the [`docs/`](./docs) folder:
 
-- [Architecture](./docs/architecture.md) - System design and data flow
 - [API Specification](./docs/api-spec.md) - Detailed API documentation
-- [Setup Guide](./docs/setup.md) - Environment setup instructions
-- [Development Guide](./docs/development.md) - Contributing guidelines
 - [Deployment Guide](./docs/deployment.md) - Azure deployment instructions
+- [Azure ACR Setup](./docs/azure-acr-setup.md) - Container Registry setup
+- [Azure Container Apps](./docs/azure-container-apps-setup.md) - Container Apps deployment
 
 ## Environment Variables
 

@@ -229,11 +229,10 @@ docuchat/
 
 자세한 문서는 [`docs/`](./docs) 폴더에서 확인할 수 있습니다:
 
-- [아키텍처](./docs/architecture.md) - 시스템 설계 및 데이터 흐름
-- [API 명세](./docs/api-spec.md) - 상세 API 문서
-- [설정 가이드](./docs/setup.md) - 환경 설정 안내
-- [개발 가이드](./docs/development.md) - 기여 가이드라인
-- [배포 가이드](./docs/deployment.md) - Azure 배포 안내
+- [API 명세](./docs/api-spec_kr.md) - 상세 API 문서
+- [배포 가이드](./docs/deployment_kr.md) - Azure 배포 안내
+- [Azure ACR 설정](./docs/azure-acr-setup_kr.md) - Container Registry 설정
+- [Azure Container Apps](./docs/azure-container-apps-setup_kr.md) - Container Apps 배포
 
 ## 환경 변수
 

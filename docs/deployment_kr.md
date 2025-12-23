@@ -1,10 +1,10 @@
-# Azure Deployment Guide
+# Azure 배포 가이드
 
-## Overview
+## 개요
 
-Guide for deploying the Docuchat project to Azure using Docker.
+Docuchat 프로젝트를 Azure에 Docker 기반으로 배포하기 위한 가이드입니다.
 
-## Deployment Architecture
+## 배포 아키텍처
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -36,58 +36,58 @@ Guide for deploying the Docuchat project to Azure using Docker.
                     └─────────────────┘
 ```
 
-## Prerequisites
+## 사전 요구사항
 
-### Required
+### 필수
 
-- Azure account with active subscription
-- Azure CLI installed (`az` command)
-- Docker Desktop installed
+- Azure 계정 및 활성 구독
+- Azure CLI 설치 (`az` 명령어)
+- Docker Desktop 설치
 - Git
 
-### Optional
+### 선택
 
-- GitHub account (for CI/CD)
-- Custom domain (optional)
+- GitHub 계정 (CI/CD 구성 시)
+- 커스텀 도메인 (선택)
 
-## Azure Resources
+## Azure 리소스
 
-### Resource Group
+### 리소스 그룹
 
-| Resource | Name (example) | SKU/Tier | Estimated Monthly Cost |
-|----------|----------------|----------|------------------------|
-| Resource Group | rg-docuchat | - | Free |
+| 리소스 | 이름 (예시) | SKU/Tier | 예상 월 비용 |
+|--------|-------------|----------|--------------|
+| Resource Group | rg-docuchat | - | 무료 |
 | Container Registry | docuchat | Basic | ~$5 |
-| Container Apps Environment | cae-docuchat | Consumption | Usage-based |
+| Container Apps Environment | cae-docuchat | Consumption | 사용량 기반 |
 | Container App (Backend) | ca-backend | - | ~$10-20 |
 | Container App (Frontend) | ca-frontend | - | ~$5-10 |
 | PostgreSQL Flexible Server | psql-docuchat | Burstable B1ms | ~$15 |
 
-**Estimated Total: $35-50/month** (varies with traffic)
+**예상 총 비용: $35-50/월** (트래픽에 따라 변동)
 
-## Docker Configuration
+## Docker 구성
 
-### Current Status
+### 현재 상태
 
-| Component | Dockerfile | Status |
-|-----------|------------|--------|
-| Backend | `Dockerfile` | ✅ Available |
-| Frontend | `frontend/Dockerfile` | ✅ Available |
+| 컴포넌트 | Dockerfile | 상태 |
+|----------|------------|------|
+| Backend | `Dockerfile` | ✅ 있음 |
+| Frontend | `frontend/Dockerfile` | ❌ 없음 (작성 필요) |
 
-### Backend Dockerfile Structure
+### 백엔드 Dockerfile 구조
 
 ```dockerfile
 # Multi-stage build
 FROM python:3.12-slim as builder
-# Install dependencies
+# 의존성 설치
 
 FROM python:3.12-slim as production
-# Production execution
+# 프로덕션 실행
 EXPOSE 8000
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-### Frontend Dockerfile Structure
+### 프론트엔드 Dockerfile (작성 예정)
 
 ```dockerfile
 # Multi-stage build
@@ -108,7 +108,7 @@ EXPOSE 3000
 CMD ["node", "server.js"]
 ```
 
-### docker-compose Configuration
+### docker-compose 구성
 
 ```yaml
 version: "3.9"
@@ -149,59 +149,59 @@ volumes:
   postgres_data:
 ```
 
-## Environment Variables
+## 환경 변수
 
-### Backend
+### 백엔드
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `GOOGLE_API_KEY` | Gemini API Key | `AIzaSy...` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
-| `APP_ENV` | Environment | `production` |
-| `CORS_ORIGINS` | Allowed domains | `https://frontend.azurecontainerapps.io` |
+| 변수명 | 설명 | 예시 |
+|--------|------|------|
+| `GOOGLE_API_KEY` | Gemini API 키 | `AIzaSy...` |
+| `DATABASE_URL` | PostgreSQL 연결 문자열 | `postgresql://user:pass@host:5432/db` |
+| `APP_ENV` | 환경 구분 | `production` |
+| `CORS_ORIGINS` | 허용 도메인 | `https://frontend.azurecontainerapps.io` |
 
-### Frontend
+### 프론트엔드
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_API_URL` | Backend API URL | `https://backend.azurecontainerapps.io` |
+| 변수명 | 설명 | 예시 |
+|--------|------|------|
+| `NEXT_PUBLIC_API_URL` | 백엔드 API URL | `https://backend.azurecontainerapps.io` |
 
-## Deployment Steps
+## 배포 단계
 
-### Phase 1: Local Docker Environment Setup
+### Phase 1: 로컬 Docker 환경 구성
 
-1. **Create Frontend Dockerfile**
+1. **프론트엔드 Dockerfile 작성**
    ```bash
-   # Create frontend/Dockerfile
-   # Create frontend/.dockerignore
+   # frontend/Dockerfile 생성
+   # frontend/.dockerignore 생성
    ```
 
-2. **docker-compose Integration**
+2. **docker-compose 통합**
    ```bash
-   # Test full stack locally
+   # 로컬에서 전체 스택 테스트
    docker-compose up --build
    ```
 
-3. **PostgreSQL Migration**
+3. **PostgreSQL 마이그레이션**
    ```bash
-   # SQLite → PostgreSQL migration
-   # Test with local PostgreSQL container
+   # SQLite → PostgreSQL 전환
+   # 로컬 PostgreSQL 컨테이너로 테스트
    ```
 
-### Phase 2: Create Azure Resources
+### Phase 2: Azure 리소스 생성
 
-1. **Create Resource Group**
+1. **리소스 그룹 생성**
    ```bash
    az group create --name rg-docuchat --location koreacentral
    ```
 
-2. **Create Container Registry**
+2. **Container Registry 생성**
    ```bash
    az acr create --name docuchat --resource-group rg-docuchat --sku Basic
    az acr login --name docuchat
    ```
 
-3. **Create PostgreSQL**
+3. **PostgreSQL 생성**
    ```bash
    az postgres flexible-server create \
      --name psql-docuchat \
@@ -213,7 +213,7 @@ volumes:
      --tier Burstable
    ```
 
-4. **Create Container Apps Environment**
+4. **Container Apps Environment 생성**
    ```bash
    az containerapp env create \
      --name cae-docuchat \
@@ -221,26 +221,26 @@ volumes:
      --location koreacentral
    ```
 
-### Phase 3: Build and Push Images
+### Phase 3: 이미지 빌드 및 푸시
 
-1. **Build Images**
+1. **이미지 빌드**
    ```bash
-   # Backend
+   # 백엔드
    docker build -t docuchat.azurecr.io/backend:latest .
 
-   # Frontend
+   # 프론트엔드
    docker build -t docuchat.azurecr.io/frontend:latest ./frontend
    ```
 
-2. **Push Images**
+2. **이미지 푸시**
    ```bash
    docker push docuchat.azurecr.io/backend:latest
    docker push docuchat.azurecr.io/frontend:latest
    ```
 
-### Phase 4: Deploy Container Apps
+### Phase 4: Container Apps 배포
 
-1. **Deploy Backend**
+1. **백엔드 배포**
    ```bash
    az containerapp create \
      --name ca-backend \
@@ -253,7 +253,7 @@ volumes:
      --env-vars GOOGLE_API_KEY=<key> DATABASE_URL=<url>
    ```
 
-2. **Deploy Frontend**
+2. **프론트엔드 배포**
    ```bash
    az containerapp create \
      --name ca-frontend \
@@ -266,9 +266,9 @@ volumes:
      --env-vars NEXT_PUBLIC_API_URL=https://ca-backend.<env>.azurecontainerapps.io
    ```
 
-### Phase 5: Configure CI/CD
+### Phase 5: CI/CD 구성
 
-Create `.github/workflows/deploy.yml`:
+`.github/workflows/deploy.yml` 생성:
 
 ```yaml
 name: Deploy to Azure
@@ -309,19 +309,19 @@ jobs:
             --image docuchat.azurecr.io/frontend:${{ github.sha }}
 ```
 
-## Security Considerations
+## 보안 고려사항
 
-### Secret Management
+### 시크릿 관리
 
-- Use Azure Key Vault (recommended)
-- Store sensitive info in GitHub Secrets
-- Pass API keys via environment variables (no hardcoding)
+- Azure Key Vault 사용 권장
+- GitHub Secrets에 민감 정보 저장
+- 환경 변수로 API 키 전달 (하드코딩 금지)
 
-### Network
+### 네트워크
 
-- Container Apps internal communication is private
-- PostgreSQL accessible only within Azure
-- Force HTTPS (Ingress settings)
+- Container Apps 내부 통신은 private
+- PostgreSQL은 Azure 내부에서만 접근 가능하도록 설정
+- HTTPS 강제 (Ingress 설정)
 
 ### CORS
 
@@ -329,44 +329,44 @@ jobs:
 # src/core/config.py
 CORS_ORIGINS = [
     "https://ca-frontend.<env>.azurecontainerapps.io",
-    # Add custom domains
+    # 커스텀 도메인 추가
 ]
 ```
 
-## Monitoring
+## 모니터링
 
 ### Azure Monitor
 
-- Container Apps provides basic metrics
-- Log Analytics Workspace integration
+- Container Apps 기본 메트릭 제공
+- Log Analytics Workspace 연동
 
-### Health Checks
+### 헬스체크
 
-- Backend: `GET /api/v1/health`
-- Frontend: Next.js default health check
+- 백엔드: `GET /api/v1/health`
+- 프론트엔드: Next.js 기본 헬스체크
 
-## Troubleshooting
+## 트러블슈팅
 
-### Common Issues
+### 자주 발생하는 문제
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| Image push failed | ACR login expired | `az acr login --name docuchat` |
-| Container start failed | Missing environment variables | Check Container App env vars |
-| DB connection failed | Firewall rules | Add Container Apps IP to PostgreSQL firewall |
-| CORS error | Domain not registered | Add frontend domain to CORS_ORIGINS |
+| 문제 | 원인 | 해결 |
+|------|------|------|
+| 이미지 푸시 실패 | ACR 로그인 만료 | `az acr login --name docuchat` |
+| 컨테이너 시작 실패 | 환경 변수 누락 | Container App 환경 변수 확인 |
+| DB 연결 실패 | 방화벽 규칙 | PostgreSQL 방화벽에 Container Apps IP 추가 |
+| CORS 오류 | 도메인 미등록 | CORS_ORIGINS에 프론트엔드 도메인 추가 |
 
-### Check Logs
+### 로그 확인
 
 ```bash
-# Container App logs
+# Container App 로그
 az containerapp logs show --name ca-backend --resource-group rg-docuchat
 
-# Real-time log streaming
+# 실시간 로그 스트리밍
 az containerapp logs show --name ca-backend --resource-group rg-docuchat --follow
 ```
 
-## Related Documentation
+## 관련 문서
 
-- [Azure ACR Setup](./azure-acr-setup.md)
-- [Azure Container Apps Setup](./azure-container-apps-setup.md)
+- [Azure ACR 설정](./azure-acr-setup_kr.md)
+- [Azure Container Apps 설정](./azure-container-apps-setup_kr.md)

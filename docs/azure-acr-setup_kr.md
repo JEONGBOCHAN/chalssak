@@ -1,36 +1,36 @@
-# Azure Container Registry (ACR) Setup Guide
+# Azure Container Registry (ACR) 설정 가이드
 
-## Table of Contents
+## 목차
 
-1. [Prerequisites](#1-prerequisites)
-2. [Create Resource Group](#2-create-resource-group)
-3. [Create Azure Container Registry](#3-create-azure-container-registry)
-4. [Login and Authentication](#4-login-and-authentication)
-5. [Build and Push Images](#5-build-and-push-images)
-6. [Service Principal Setup for GitHub Actions](#6-service-principal-setup-for-github-actions)
-7. [Azure Portal Method](#7-azure-portal-method)
-8. [Troubleshooting](#8-troubleshooting)
+1. [사전 요구사항](#1-사전-요구사항)
+2. [리소스 그룹 생성](#2-리소스-그룹-생성)
+3. [Azure Container Registry 생성](#3-azure-container-registry-생성)
+4. [로그인 및 인증](#4-로그인-및-인증)
+5. [이미지 빌드 및 푸시](#5-이미지-빌드-및-푸시)
+6. [GitHub Actions용 서비스 주체 설정](#6-github-actions용-서비스-주체-설정)
+7. [Azure Portal 사용 방법](#7-azure-portal-사용-방법)
+8. [트러블슈팅](#8-트러블슈팅)
 
 ---
 
-## 1. Prerequisites
+## 1. 사전 요구사항
 
-### Required Items
+### 필수 항목
 
-| Item | Description | Verification |
-|------|-------------|--------------|
-| Azure Subscription | Active Azure subscription | Check after Azure Portal login |
-| Azure CLI | v2.50.0 or higher recommended | `az --version` |
-| Docker | For local image builds | `docker --version` |
+| 항목 | 설명 | 확인 방법 |
+|------|------|----------|
+| Azure 구독 | 활성 Azure 구독 필요 | Azure Portal 로그인 후 확인 |
+| Azure CLI | v2.50.0 이상 권장 | `az --version` |
+| Docker | 로컬 이미지 빌드용 | `docker --version` |
 
-### Install Azure CLI
+### Azure CLI 설치
 
 **Windows (PowerShell):**
 ```powershell
-# Install with winget
+# winget으로 설치
 winget install -e --id Microsoft.AzureCLI
 
-# Or download MSI installer
+# 또는 MSI 설치 프로그램 다운로드
 # https://aka.ms/installazurecliwindows
 ```
 
@@ -44,183 +44,183 @@ brew update && brew install azure-cli
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 ```
 
-### Azure CLI Login
+### Azure CLI 로그인
 
 ```bash
-# Browser-based login (recommended)
+# 브라우저 기반 로그인 (권장)
 az login
 
-# Device code login (for environments without browser)
+# 디바이스 코드 로그인 (브라우저 없는 환경)
 az login --use-device-code
 
-# Verify login
+# 로그인 확인
 az account show
 ```
 
 ---
 
-## 2. Create Resource Group
+## 2. 리소스 그룹 생성
 
-A resource group is a logical container for Azure resources.
+리소스 그룹은 Azure 리소스를 논리적으로 그룹화하는 컨테이너입니다.
 
 ### Azure CLI
 
 ```bash
-# Set variables
+# 변수 설정
 RESOURCE_GROUP="rg-docuchat"
 LOCATION="koreacentral"
 
-# Create resource group
+# 리소스 그룹 생성
 az group create \
   --name $RESOURCE_GROUP \
   --location $LOCATION
 
-# Verify creation
+# 생성 확인
 az group show --name $RESOURCE_GROUP --output table
 ```
 
-**Expected output:**
+**예상 출력:**
 ```
 Location       Name
 -------------  -----------
 koreacentral   rg-docuchat
 ```
 
-### Available Locations
+### 사용 가능한 위치 목록
 
 ```bash
-# Check Korea regions
+# 한국 리전 확인
 az account list-locations --query "[?contains(name, 'korea')]" --output table
 ```
 
-| Location Name | Display Name |
-|---------------|--------------|
-| koreacentral | Korea Central (Seoul) |
-| koreasouth | Korea South (Busan) |
+| 위치 이름 | 표시 이름 |
+|-----------|----------|
+| koreacentral | Korea Central (서울) |
+| koreasouth | Korea South (부산) |
 
 ---
 
-## 3. Create Azure Container Registry
+## 3. Azure Container Registry 생성
 
-### ACR SKU Comparison
+### ACR SKU 비교
 
-| SKU | Storage | Read ops/min | Price/month | Use Case |
-|-----|---------|--------------|-------------|----------|
-| Basic | 10GB | 1,000 | ~$5 | Dev/Test |
-| Standard | 100GB | 10,000 | ~$20 | Small production |
-| Premium | 500GB | 10,000+ | ~$50 | Large production, geo-replication |
+| SKU | 저장소 | 분당 읽기 작업 | 가격(월) | 용도 |
+|-----|--------|---------------|---------|------|
+| Basic | 10GB | 1,000 | ~$5 | 개발/테스트 |
+| Standard | 100GB | 10,000 | ~$20 | 소규모 프로덕션 |
+| Premium | 500GB | 10,000+ | ~$50 | 대규모 프로덕션, 지역 복제 |
 
-**Recommended:** Use `Basic` SKU for learning/development
+**권장:** 학습/개발 목적으로는 `Basic` SKU 사용
 
 ### Azure CLI
 
 ```bash
-# Set variables
+# 변수 설정
 ACR_NAME="docuchat"
 RESOURCE_GROUP="rg-docuchat"
 SKU="Basic"
 
-# Check ACR name availability (must be globally unique)
+# ACR 이름 가용성 확인 (전역 고유해야 함)
 az acr check-name --name $ACR_NAME
 
-# Create ACR
+# ACR 생성
 az acr create \
   --resource-group $RESOURCE_GROUP \
   --name $ACR_NAME \
   --sku $SKU \
   --admin-enabled true
 
-# Verify creation
+# 생성 확인
 az acr show --name $ACR_NAME --output table
 ```
 
-**Expected output:**
+**예상 출력:**
 ```
 NAME       RESOURCE GROUP   LOCATION       SKU    LOGIN SERVER           CREATION DATE
 ---------  ---------------  -------------  -----  ---------------------  -------------------------
 docuchat   rg-docuchat      koreacentral   Basic  docuchat.azurecr.io    2025-12-21T00:00:00+00:00
 ```
 
-### Get Important Information
+### 중요 정보 확인
 
 ```bash
-# Get login server URL
+# 로그인 서버 URL 확인
 az acr show --name $ACR_NAME --query loginServer --output tsv
-# Output: docuchat.azurecr.io
+# 출력: docuchat.azurecr.io
 
-# Get admin credentials (for development)
+# 관리자 자격 증명 확인 (개발 환경용)
 az acr credential show --name $ACR_NAME
 ```
 
 ---
 
-## 4. Login and Authentication
+## 4. 로그인 및 인증
 
-### Method 1: Azure CLI Integrated Login (Recommended)
+### 방법 1: Azure CLI 통합 로그인 (권장)
 
 ```bash
-# Login to ACR (uses Azure credentials)
+# ACR에 로그인 (Azure 자격 증명 사용)
 az acr login --name docuchat
 
-# Success message
+# 성공 메시지
 # Login Succeeded
 ```
 
-### Method 2: Docker Direct Login
+### 방법 2: Docker 직접 로그인
 
 ```bash
-# Get admin credentials
+# 관리자 자격 증명 가져오기
 ACR_NAME="docuchat"
 USERNAME=$(az acr credential show --name $ACR_NAME --query username --output tsv)
 PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" --output tsv)
 
-# Docker login
+# Docker 로그인
 docker login docuchat.azurecr.io --username $USERNAME --password $PASSWORD
 ```
 
-### Verify Login
+### 로그인 확인
 
 ```bash
-# Check Docker config file
+# Docker 설정 파일에서 확인
 cat ~/.docker/config.json | grep docuchat
 ```
 
 ---
 
-## 5. Build and Push Images
+## 5. 이미지 빌드 및 푸시
 
-### Build Locally and Push
+### 로컬에서 빌드 후 푸시
 
 ```bash
-# Set variables
+# 변수 설정
 ACR_NAME="docuchat"
 ACR_LOGIN_SERVER="docuchat.azurecr.io"
 IMAGE_TAG="v1.0.0"
 
-# Build backend image
+# 백엔드 이미지 빌드
 docker build -t $ACR_LOGIN_SERVER/docuchat-backend:$IMAGE_TAG -f Dockerfile .
 
-# Build frontend image
+# 프론트엔드 이미지 빌드
 docker build -t $ACR_LOGIN_SERVER/docuchat-frontend:$IMAGE_TAG -f frontend/Dockerfile ./frontend
 
-# Push to ACR
+# ACR에 푸시
 docker push $ACR_LOGIN_SERVER/docuchat-backend:$IMAGE_TAG
 docker push $ACR_LOGIN_SERVER/docuchat-frontend:$IMAGE_TAG
 ```
 
-### Remote Build with ACR Tasks (Recommended)
+### ACR Tasks로 원격 빌드 (권장)
 
-Build directly in ACR without local Docker.
+로컬에 Docker가 없어도 ACR에서 직접 빌드할 수 있습니다.
 
 ```bash
-# Build backend image in ACR
+# 백엔드 이미지를 ACR에서 직접 빌드
 az acr build \
   --registry $ACR_NAME \
   --image docuchat-backend:$IMAGE_TAG \
   --file Dockerfile \
   .
 
-# Build frontend image in ACR
+# 프론트엔드 이미지를 ACR에서 직접 빌드
 az acr build \
   --registry $ACR_NAME \
   --image docuchat-frontend:$IMAGE_TAG \
@@ -228,33 +228,33 @@ az acr build \
   ./frontend
 ```
 
-### List Images
+### 이미지 목록 확인
 
 ```bash
-# List repositories
+# 레포지토리 목록
 az acr repository list --name $ACR_NAME --output table
 
-# List tags for specific image
+# 특정 이미지의 태그 목록
 az acr repository show-tags --name $ACR_NAME --repository docuchat-backend --output table
 ```
 
 ---
 
-## 6. Service Principal Setup for GitHub Actions
+## 6. GitHub Actions용 서비스 주체 설정
 
-A Service Principal is needed for CI/CD pipeline access to ACR.
+CI/CD 파이프라인에서 ACR에 접근하려면 서비스 주체(Service Principal)가 필요합니다.
 
-### Create Service Principal
+### 서비스 주체 생성
 
 ```bash
-# Set variables
+# 변수 설정
 ACR_NAME="docuchat"
 SERVICE_PRINCIPAL_NAME="sp-docuchat-github"
 
-# Get ACR resource ID
+# ACR 리소스 ID 가져오기
 ACR_REGISTRY_ID=$(az acr show --name $ACR_NAME --query "id" --output tsv)
 
-# Create service principal (with acrpush role)
+# 서비스 주체 생성 (acrpush 역할 부여)
 az ad sp create-for-rbac \
   --name $SERVICE_PRINCIPAL_NAME \
   --scopes $ACR_REGISTRY_ID \
@@ -262,7 +262,7 @@ az ad sp create-for-rbac \
   --sdk-auth
 ```
 
-**Output example (save to GitHub Secrets):**
+**출력 예시 (GitHub Secrets에 저장할 값):**
 ```json
 {
   "clientId": "<CLIENT_ID>",
@@ -278,18 +278,18 @@ az ad sp create-for-rbac \
 }
 ```
 
-### Configure GitHub Secrets
+### GitHub Secrets 설정
 
-Go to GitHub Repository → Settings → Secrets and variables → Actions and add:
+GitHub Repository → Settings → Secrets and variables → Actions에서 다음 시크릿 추가:
 
 | Secret Name | Value |
 |-------------|-------|
-| `AZURE_CREDENTIALS` | Full JSON output above |
+| `AZURE_CREDENTIALS` | 위 JSON 전체 출력 |
 | `ACR_LOGIN_SERVER` | `docuchat.azurecr.io` |
 | `ACR_USERNAME` | `<clientId>` |
 | `ACR_PASSWORD` | `<clientSecret>` |
 
-### GitHub Actions Workflow Example
+### GitHub Actions 워크플로우 예시
 
 ```yaml
 # .github/workflows/docker-build.yml
@@ -333,100 +333,100 @@ jobs:
 
 ---
 
-## 7. Azure Portal Method
+## 7. Azure Portal 사용 방법
 
-If using Azure Portal instead of Azure CLI:
+Azure CLI 대신 Azure Portal을 사용하는 경우:
 
-### 7.1 Create Resource Group
+### 7.1 리소스 그룹 생성
 
-1. Login to [Azure Portal](https://portal.azure.com)
-2. Search "Resource groups" in top search bar
-3. Click "Resource groups" → "+ Create"
-4. Settings:
-   - Subscription: Select your subscription
-   - Resource group: `rg-docuchat`
-   - Region: `Korea Central`
-5. "Review + create" → "Create"
+1. [Azure Portal](https://portal.azure.com) 로그인
+2. 상단 검색창에 "리소스 그룹" 입력
+3. "리소스 그룹" 클릭 → "+ 만들기"
+4. 설정:
+   - 구독: 본인 구독 선택
+   - 리소스 그룹: `rg-docuchat`
+   - 지역: `Korea Central`
+5. "검토 + 만들기" → "만들기"
 
-### 7.2 Create Container Registry
+### 7.2 Container Registry 생성
 
-1. Search "Container Registry" in top search bar
-2. Click "Container Registries" → "+ Create"
-3. Basics:
-   - Subscription: Select your subscription
-   - Resource group: `rg-docuchat`
-   - Registry name: `docuchat` (globally unique)
-   - Location: `Korea Central`
+1. 상단 검색창에 "Container Registry" 입력
+2. "Container Registries" 클릭 → "+ 만들기"
+3. 기본 사항:
+   - 구독: 본인 구독 선택
+   - 리소스 그룹: `rg-docuchat`
+   - 레지스트리 이름: `docuchat` (전역 고유)
+   - 위치: `Korea Central`
    - SKU: `Basic`
-4. "Review + create" → "Create"
+4. "검토 + 만들기" → "만들기"
 
-### 7.3 Enable Admin Account
+### 7.3 관리자 계정 활성화
 
-1. Click the created Container Registry
-2. Left menu → "Access keys"
-3. Enable "Admin user" toggle
-4. Note the username and password (for Docker login)
+1. 생성된 Container Registry 클릭
+2. 왼쪽 메뉴 → "액세스 키"
+3. "관리 사용자" 토글 활성화
+4. 사용자 이름과 비밀번호 확인 (Docker 로그인용)
 
 ---
 
-## 8. Troubleshooting
+## 8. 트러블슈팅
 
-### Common Issues
+### 자주 발생하는 문제
 
-#### 1. ACR Name Unavailable
+#### 1. ACR 이름 사용 불가
 
 ```
 Error: The registry name is already in use
 ```
 
-**Solution:**
+**해결:**
 ```bash
-# Try a different name
+# 다른 이름 시도
 az acr check-name --name docuchat2024
 ```
 
-#### 2. Docker Login Failed
+#### 2. Docker 로그인 실패
 
 ```
 Error: unauthorized: authentication required
 ```
 
-**Solution:**
+**해결:**
 ```bash
-# Retry ACR login
+# ACR 로그인 재시도
 az acr login --name docuchat
 
-# Or check admin credentials
+# 또는 관리자 자격 증명 확인
 az acr credential show --name docuchat
 ```
 
-#### 3. Image Push Permission Denied
+#### 3. 이미지 푸시 권한 없음
 
 ```
 Error: denied: requested access to the resource is denied
 ```
 
-**Solution:**
+**해결:**
 ```bash
-# Check role assignment
+# 역할 확인
 az role assignment list --scope /subscriptions/<SUB_ID>/resourceGroups/rg-docuchat/providers/Microsoft.ContainerRegistry/registries/docuchat
 
-# Add acrpush role
+# acrpush 역할 추가
 az role assignment create \
   --assignee <USER_OR_SP_ID> \
   --scope <ACR_RESOURCE_ID> \
   --role acrpush
 ```
 
-#### 4. ACR Build Timeout
+#### 4. ACR 빌드 타임아웃
 
 ```
 Error: Build timed out
 ```
 
-**Solution:**
+**해결:**
 ```bash
-# Increase timeout (in seconds)
+# 타임아웃 시간 증가 (초 단위)
 az acr build \
   --registry $ACR_NAME \
   --image docuchat-backend:latest \
@@ -434,40 +434,40 @@ az acr build \
   .
 ```
 
-### Useful Diagnostic Commands
+### 유용한 진단 명령어
 
 ```bash
-# Check ACR status
+# ACR 상태 확인
 az acr show --name docuchat --query provisioningState
 
-# Check ACR usage
+# ACR 사용량 확인
 az acr show-usage --name docuchat --output table
 
-# Check ACR logs
+# ACR 로그 확인
 az acr task logs --name docuchat
 
-# Delete image (cleanup storage)
+# 이미지 삭제 (저장소 정리)
 az acr repository delete --name docuchat --repository docuchat-backend --yes
 ```
 
 ---
 
-## Next Steps
+## 다음 단계
 
-After completing this guide:
+이 가이드를 완료하면:
 
-1. ✅ Azure Container Registry created
-2. ✅ Docker image build and push ready
-3. ✅ GitHub Actions integration ready
+1. ✅ Azure Container Registry 생성 완료
+2. ✅ Docker 이미지 빌드 및 푸시 가능
+3. ✅ GitHub Actions 연동 준비 완료
 
-Next:
-- [Azure Container Apps Setup](./azure-container-apps-setup.md)
+다음 단계:
+- [Azure Container Apps 설정](./azure-container-apps-setup_kr.md)
 
 ---
 
-## References
+## 참고 자료
 
-- [Azure Container Registry Official Docs](https://learn.microsoft.com/azure/container-registry/)
-- [Azure CLI Installation Guide](https://learn.microsoft.com/cli/azure/install-azure-cli)
-- [ACR Tasks Overview](https://learn.microsoft.com/azure/container-registry/container-registry-tasks-overview)
-- [Using ACR with GitHub Actions](https://learn.microsoft.com/azure/container-registry/container-registry-github-action)
+- [Azure Container Registry 공식 문서](https://learn.microsoft.com/azure/container-registry/)
+- [Azure CLI 설치 가이드](https://learn.microsoft.com/cli/azure/install-azure-cli)
+- [ACR Tasks 개요](https://learn.microsoft.com/azure/container-registry/container-registry-tasks-overview)
+- [GitHub Actions에서 ACR 사용](https://learn.microsoft.com/azure/container-registry/container-registry-github-action)

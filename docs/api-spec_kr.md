@@ -1,4 +1,4 @@
-# API Specification
+# API 명세
 
 ## Base URL
 
@@ -6,15 +6,15 @@
 http://localhost:8000/api/v1
 ```
 
-## Authentication
+## 인증
 
-No authentication in current version (to be implemented)
+현재 버전에서는 인증 없음 (추후 구현)
 
 ---
 
-## Channel API
+## 채널 API
 
-### Create Channel
+### 채널 생성
 
 ```
 POST /channels
@@ -23,38 +23,38 @@ POST /channels
 **Request Body:**
 ```json
 {
-  "name": "Project Documents",
-  "description": "Collection of project technical documents"
+  "name": "프로젝트 문서",
+  "description": "프로젝트 관련 기술 문서 모음"
 }
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| name | string | Yes | Channel name (1-100 chars) |
-| description | string | No | Channel description (max 500 chars) |
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| name | string | O | 채널 이름 (1-100자) |
+| description | string | X | 채널 설명 (최대 500자) |
 
 **Response (201 Created):**
 ```json
 {
   "id": "fileSearchStores/abc123",
-  "name": "Project Documents",
-  "description": "Collection of project technical documents",
+  "name": "프로젝트 문서",
+  "description": "프로젝트 관련 기술 문서 모음",
   "created_at": "2025-12-20T12:00:00Z",
   "file_count": 0
 }
 ```
 
-### List Channels
+### 채널 목록 조회
 
 ```
 GET /channels?limit=10&offset=0
 ```
 
 **Query Parameters:**
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| limit | integer | No | all | Max items to return (1-100) |
-| offset | integer | No | 0 | Number to skip |
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|------|--------|------|
+| limit | integer | X | 전체 | 최대 반환 개수 (1-100) |
+| offset | integer | X | 0 | 건너뛸 개수 |
 
 **Response (200 OK):**
 ```json
@@ -62,8 +62,8 @@ GET /channels?limit=10&offset=0
   "channels": [
     {
       "id": "fileSearchStores/abc123",
-      "name": "Project Documents",
-      "description": "Collection of project technical documents",
+      "name": "프로젝트 문서",
+      "description": "프로젝트 관련 기술 문서 모음",
       "created_at": "2025-12-20T12:00:00Z",
       "file_count": 5
     }
@@ -72,7 +72,7 @@ GET /channels?limit=10&offset=0
 }
 ```
 
-### Get Channel
+### 채널 상세 조회
 
 ```
 GET /channels/{channel_id}
@@ -82,14 +82,14 @@ GET /channels/{channel_id}
 ```json
 {
   "id": "fileSearchStores/abc123",
-  "name": "Project Documents",
-  "description": "Collection of project technical documents",
+  "name": "프로젝트 문서",
+  "description": "프로젝트 관련 기술 문서 모음",
   "created_at": "2025-12-20T12:00:00Z",
   "file_count": 5
 }
 ```
 
-### Delete Channel
+### 채널 삭제
 
 ```
 DELETE /channels/{channel_id}
@@ -99,18 +99,18 @@ DELETE /channels/{channel_id}
 
 ---
 
-## Document API
+## 문서 API
 
-### Upload Document
+### 문서 업로드
 
 ```
 POST /documents?channel_id={channel_id}
 ```
 
 **Request:** `multipart/form-data`
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| file | file | Yes | File to upload |
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| file | file | O | 업로드할 파일 |
 
 **Response (202 Accepted):**
 ```json
@@ -122,7 +122,7 @@ POST /documents?channel_id={channel_id}
 }
 ```
 
-### Upload Document from URL
+### URL에서 문서 업로드
 
 ```
 POST /documents/url?channel_id={channel_id}
@@ -145,7 +145,7 @@ POST /documents/url?channel_id={channel_id}
 }
 ```
 
-### List Documents
+### 문서 목록 조회
 
 ```
 GET /documents?channel_id={channel_id}
@@ -169,7 +169,7 @@ GET /documents?channel_id={channel_id}
 }
 ```
 
-### Get Document Upload Status
+### 문서 업로드 상태 조회
 
 ```
 GET /documents/{document_id}/status
@@ -184,7 +184,7 @@ GET /documents/{document_id}/status
 }
 ```
 
-### Delete Document
+### 문서 삭제
 
 ```
 DELETE /documents/{document_id}
@@ -194,9 +194,9 @@ DELETE /documents/{document_id}
 
 ---
 
-## YouTube Source API
+## YouTube 소스 API
 
-### Add YouTube Source
+### YouTube 소스 추가
 
 ```
 POST /channels/{channel_id}/sources/youtube
@@ -222,22 +222,22 @@ POST /channels/{channel_id}/sources/youtube
 }
 ```
 
-**Error Responses:**
-- 400: Invalid YouTube URL
-- 404: Channel not found
-- 413: Capacity exceeded
-- 422: Captions not available
+**에러 응답:**
+- 400: 잘못된 YouTube URL
+- 404: 채널을 찾을 수 없음
+- 413: 용량 초과
+- 422: 자막을 사용할 수 없음
 
-### Preview YouTube Transcript
+### YouTube 자막 미리보기
 
 ```
 GET /channels/{channel_id}/sources/youtube/preview?url=YOUTUBE_URL
 ```
 
 **Query Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| url | string | Yes | YouTube video URL |
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| url | string | O | YouTube 영상 URL |
 
 **Response (200 OK):**
 ```json
@@ -247,16 +247,16 @@ GET /channels/{channel_id}/sources/youtube/preview?url=YOUTUBE_URL
   "language": "ko",
   "segment_count": 150,
   "character_count": 5000,
-  "preview": "Transcript preview...",
+  "preview": "자막 내용 미리보기...",
   "available": true
 }
 ```
 
 ---
 
-## Chat API
+## 채팅 API
 
-### Ask Question
+### 질문하기
 
 ```
 POST /chat?channel_id={channel_id}
@@ -265,37 +265,37 @@ POST /chat?channel_id={channel_id}
 **Request Body:**
 ```json
 {
-  "query": "How is the payment cancellation API retry logic implemented?"
+  "query": "결제 취소 API의 재시도 로직은 어떻게 구현하기로 했지?"
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "query": "How is the payment cancellation API retry logic implemented?",
-  "response": "According to the technical review meeting notes from 2024-10-15, the payment cancellation API retries up to 3 times...",
+  "query": "결제 취소 API의 재시도 로직은 어떻게 구현하기로 했지?",
+  "response": "2024-10-15 기술 리뷰 미팅 노트에 따르면, 결제 취소 API는 최대 3회 재시도하며...",
   "sources": [
     {
-      "source": "tech_review_20241015.pdf",
+      "source": "기술리뷰_20241015.pdf",
       "page": null,
-      "content": "The retry logic uses exponential backoff..."
+      "content": "재시도 로직은 exponential backoff를 사용하여..."
     }
   ],
   "created_at": "2025-12-20T12:00:00Z"
 }
 ```
 
-### Get Chat History
+### 채팅 히스토리 조회
 
 ```
 GET /chat/history?channel_id={channel_id}&limit=100
 ```
 
 **Query Parameters:**
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| channel_id | string | Yes | - | Channel ID |
-| limit | integer | No | 100 | Max messages (1-500) |
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|------|--------|------|
+| channel_id | string | O | - | 채널 ID |
+| limit | integer | X | 100 | 최대 메시지 수 (1-500) |
 
 **Response (200 OK):**
 ```json
@@ -304,18 +304,18 @@ GET /chat/history?channel_id={channel_id}&limit=100
   "messages": [
     {
       "role": "user",
-      "content": "What is the retry logic for payment cancellation API?",
+      "content": "결제 취소 API의 재시도 로직은?",
       "sources": [],
       "created_at": "2025-12-20T12:00:00Z"
     },
     {
       "role": "assistant",
-      "content": "According to the technical review meeting notes from 2024-10-15...",
+      "content": "2024-10-15 기술 리뷰 미팅 노트에 따르면...",
       "sources": [
         {
-          "source": "tech_review_20241015.pdf",
+          "source": "기술리뷰_20241015.pdf",
           "page": null,
-          "content": "The retry logic..."
+          "content": "재시도 로직은..."
         }
       ],
       "created_at": "2025-12-20T12:00:01Z"
@@ -325,7 +325,7 @@ GET /chat/history?channel_id={channel_id}&limit=100
 }
 ```
 
-### Delete Chat History
+### 채팅 히스토리 삭제
 
 ```
 DELETE /chat/history?channel_id={channel_id}
@@ -337,7 +337,7 @@ DELETE /chat/history?channel_id={channel_id}
 
 ## FAQ API
 
-### Generate FAQ
+### FAQ 자동 생성
 
 ```
 POST /channels/{channel_id}/generate-faq
@@ -350,9 +350,9 @@ POST /channels/{channel_id}/generate-faq
 }
 ```
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| count | integer | No | 5 | Number of FAQs to generate (1-20) |
+| 필드 | 타입 | 필수 | 기본값 | 설명 |
+|------|------|------|--------|------|
+| count | integer | X | 5 | 생성할 FAQ 개수 (1-20) |
 
 **Response (200 OK):**
 ```json
@@ -360,28 +360,28 @@ POST /channels/{channel_id}/generate-faq
   "channel_id": "fileSearchStores/abc123",
   "items": [
     {
-      "question": "What is the main goal of the project?",
-      "answer": "The main goal of this project is..."
+      "question": "프로젝트의 주요 목표는 무엇인가요?",
+      "answer": "이 프로젝트의 주요 목표는..."
     },
     {
-      "question": "What tech stack is used?",
-      "answer": "FastAPI, LangGraph, and Gemini API are used..."
+      "question": "어떤 기술 스택을 사용하나요?",
+      "answer": "FastAPI, LangGraph, Gemini API를 사용합니다..."
     }
   ],
   "generated_at": "2025-12-20T12:00:00Z"
 }
 ```
 
-**Error Responses:**
-- 400: No documents in channel
-- 404: Channel not found
-- 500: FAQ generation failed
+**에러 응답:**
+- 400: 채널에 문서가 없음
+- 404: 채널을 찾을 수 없음
+- 500: FAQ 생성 실패
 
 ---
 
-## Capacity API
+## 용량 API
 
-### Get Channel Capacity
+### 채널 용량 조회
 
 ```
 GET /capacity?channel_id={channel_id}
@@ -407,9 +407,9 @@ GET /capacity?channel_id={channel_id}
 
 ---
 
-## Admin API
+## 관리자 API
 
-### Get System Stats
+### 시스템 통계 조회
 
 ```
 GET /admin/stats
@@ -449,7 +449,7 @@ GET /admin/stats
 }
 ```
 
-### Get Channel Details
+### 채널별 상세 분석
 
 ```
 GET /admin/channels
@@ -461,7 +461,7 @@ GET /admin/channels
   "channels": [
     {
       "gemini_store_id": "fileSearchStores/abc123",
-      "name": "Project Documents",
+      "name": "프로젝트 문서",
       "created_at": "2025-12-20T12:00:00Z",
       "last_accessed_at": "2025-12-20T14:00:00Z",
       "file_count": 5,
@@ -476,7 +476,7 @@ GET /admin/channels
 }
 ```
 
-### Get API Metrics
+### API 메트릭 조회
 
 ```
 GET /admin/api-metrics
@@ -503,7 +503,7 @@ GET /admin/api-metrics
 }
 ```
 
-### Reset API Metrics
+### API 메트릭 리셋
 
 ```
 POST /admin/api-metrics/reset
@@ -518,9 +518,9 @@ POST /admin/api-metrics/reset
 
 ---
 
-## Scheduler API
+## 스케줄러 API
 
-### Get Scheduler Status
+### 스케줄러 상태 조회
 
 ```
 GET /scheduler/status
@@ -542,7 +542,7 @@ GET /scheduler/status
 }
 ```
 
-### Get Job History
+### 작업 실행 히스토리
 
 ```
 GET /scheduler/history?limit=20
@@ -563,7 +563,7 @@ GET /scheduler/history?limit=20
 }
 ```
 
-### Run Job Manually
+### 작업 수동 실행
 
 ```
 POST /scheduler/jobs/{job_id}/run
@@ -578,9 +578,9 @@ POST /scheduler/jobs/{job_id}/run
 
 ---
 
-## Trash API
+## 휴지통 API
 
-### List Trash Items
+### 휴지통 목록 조회
 
 ```
 GET /trash
@@ -593,8 +593,8 @@ GET /trash
     {
       "id": 1,
       "type": "channel",
-      "name": "Deleted Channel",
-      "description": "Channel description",
+      "name": "삭제된 채널",
+      "description": "채널 설명",
       "deleted_at": "2025-12-20T12:00:00Z",
       "gemini_store_id": "fileSearchStores/abc123",
       "file_count": 5,
@@ -603,8 +603,8 @@ GET /trash
     {
       "id": 2,
       "type": "note",
-      "name": "Deleted Note",
-      "description": "Note content preview...",
+      "name": "삭제된 노트",
+      "description": "노트 내용 미리보기...",
       "deleted_at": "2025-12-20T11:00:00Z",
       "gemini_store_id": null,
       "file_count": null,
@@ -615,52 +615,52 @@ GET /trash
 }
 ```
 
-### Restore Trash Item
+### 휴지통 항목 복원
 
 ```
 POST /trash/{type}/{id}/restore
 ```
 
 **Path Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| type | string | Yes | Item type ('channel' or 'note') |
-| id | integer | Yes | Item ID |
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| type | string | O | 항목 타입 ('channel' 또는 'note') |
+| id | integer | O | 항목 ID |
 
 **Response (200 OK):**
 ```json
 {
   "id": 1,
   "type": "channel",
-  "message": "Channel 'Deleted Channel' has been restored",
+  "message": "Channel '삭제된 채널' has been restored",
   "restored_at": "2025-12-20T12:30:00Z"
 }
 ```
 
-### Permanently Delete Trash Item
+### 휴지통 항목 영구 삭제
 
 ```
 DELETE /trash/{type}/{id}
 ```
 
 **Path Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| type | string | Yes | Item type ('channel' or 'note') |
-| id | integer | Yes | Item ID |
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| type | string | O | 항목 타입 ('channel' 또는 'note') |
+| id | integer | O | 항목 ID |
 
 **Response (204 No Content)**
 
-### Empty Trash
+### 휴지통 비우기
 
 ```
 DELETE /trash?confirm=true
 ```
 
 **Query Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| confirm | boolean | Yes | Deletion confirmation (must be true) |
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| confirm | boolean | O | 삭제 확인 (true 필수) |
 
 **Response (200 OK):**
 ```json
@@ -671,7 +671,7 @@ DELETE /trash?confirm=true
 }
 ```
 
-### Get Trash Stats
+### 휴지통 통계 조회
 
 ```
 GET /trash/stats
@@ -686,108 +686,14 @@ GET /trash/stats
 }
 ```
 
-**Notes:**
-- Deleted items are automatically permanently deleted after 30 days
-- Channels are soft-deleted and can be restored from trash
-- Permanent deletion also removes the Gemini File Search Store
+**참고:**
+- 삭제된 항목은 30일 후 자동으로 영구 삭제됩니다.
+- 채널 삭제 시 Soft Delete로 처리되며, 휴지통에서 복원할 수 있습니다.
+- 영구 삭제 시 Gemini File Search Store도 함께 삭제됩니다.
 
 ---
 
-## Document Preview API
-
-### Get Document Preview
-
-```
-GET /channels/{channel_id}/documents/{document_id}/preview?page=1&page_size=2000&search_term=keyword
-```
-
-**Query Parameters:**
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| page | integer | No | 1 | Page number (starts from 1) |
-| page_size | integer | No | 2000 | Characters per page (100-10000) |
-| search_term | string | No | - | Term to highlight |
-
-**Response (200 OK):**
-```json
-{
-  "document_id": "files/abc123",
-  "filename": "api-spec.pdf",
-  "total_pages": 5,
-  "total_characters": 10000,
-  "current_page": 1,
-  "page_size": 2000,
-  "content": "Document content...",
-  "highlights": [
-    {
-      "start": 100,
-      "end": 107,
-      "text": "keyword"
-    }
-  ],
-  "has_next": true,
-  "has_previous": false,
-  "cached_at": "2025-12-20T12:00:00Z"
-}
-```
-
-### Get Specific Page
-
-```
-GET /channels/{channel_id}/documents/{document_id}/pages/{page_num}
-```
-
-**Path Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| page_num | integer | Yes | Page number (starts from 1) |
-
-**Response:** Same as document preview
-
-### Find Source Location
-
-```
-GET /channels/{channel_id}/documents/{document_id}/find-source?source_text=searchtext
-```
-
-**Query Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| source_text | string | Yes | Source text to find |
-| page_size | integer | No | Size for page calculation |
-
-**Response (200 OK):**
-```json
-{
-  "found": true,
-  "location": {
-    "document_id": "files/abc123",
-    "filename": "api-spec.pdf",
-    "page_number": 3,
-    "position": 5000,
-    "context": "...surrounding context text...",
-    "highlights": [
-      {
-        "start": 100,
-        "end": 110,
-        "text": "searchtext"
-      }
-    ]
-  }
-}
-```
-
-### Clear Preview Cache
-
-```
-DELETE /channels/{channel_id}/documents/{document_id}/preview-cache
-```
-
-**Response (204 No Content)**
-
----
-
-## Health Check
+## 헬스체크
 
 ```
 GET /health
@@ -802,41 +708,135 @@ GET /health
 
 ---
 
-## Error Responses
+## 에러 응답
 
-### Format
+### 형식
 
 ```json
 {
-  "detail": "Channel not found: fileSearchStores/xxx"
+  "detail": "채널을 찾을 수 없습니다: fileSearchStores/xxx"
 }
 ```
 
-### HTTP Status Codes
+### HTTP 상태 코드
 
-| HTTP Status | Description |
-|-------------|-------------|
-| 400 | Bad request (file format, size, etc.) |
-| 404 | Channel/document not found |
-| 413 | Capacity exceeded |
-| 422 | Validation failed |
-| 500 | Internal server error |
+| HTTP 상태 | 설명 |
+|----------|------|
+| 400 | 잘못된 요청 (파일 형식, 크기 등) |
+| 404 | 채널/문서 없음 |
+| 413 | 용량 초과 |
+| 422 | 유효성 검사 실패 |
+| 500 | 서버 내부 오류 |
 
 ---
 
-## Supported File Formats
+## 문서 미리보기 API
 
-| Category | Extensions |
-|----------|------------|
-| Documents | .pdf, .docx, .pptx, .xlsx |
-| Text | .txt, .md, .html |
-| Data | .json, .csv, .xml |
-| Code | .py, .js, .java, .cpp |
+### 문서 미리보기 조회
 
-## Limits
+```
+GET /channels/{channel_id}/documents/{document_id}/preview?page=1&page_size=2000&search_term=keyword
+```
 
-| Item | Limit |
-|------|-------|
-| File size | Max 100MB |
-| Files per channel | Max 50 (configurable) |
-| Capacity per channel | Max 100MB (configurable) |
+**Query Parameters:**
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|------|--------|------|
+| page | integer | X | 1 | 페이지 번호 (1부터 시작) |
+| page_size | integer | X | 2000 | 페이지당 문자 수 (100-10000) |
+| search_term | string | X | - | 하이라이팅할 검색어 |
+
+**Response (200 OK):**
+```json
+{
+  "document_id": "files/abc123",
+  "filename": "api-spec.pdf",
+  "total_pages": 5,
+  "total_characters": 10000,
+  "current_page": 1,
+  "page_size": 2000,
+  "content": "문서 내용...",
+  "highlights": [
+    {
+      "start": 100,
+      "end": 107,
+      "text": "keyword"
+    }
+  ],
+  "has_next": true,
+  "has_previous": false,
+  "cached_at": "2025-12-20T12:00:00Z"
+}
+```
+
+### 특정 페이지 조회
+
+```
+GET /channels/{channel_id}/documents/{document_id}/pages/{page_num}
+```
+
+**Path Parameters:**
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| page_num | integer | O | 페이지 번호 (1부터 시작) |
+
+**Response:** 문서 미리보기 조회와 동일
+
+### 출처 위치 찾기
+
+```
+GET /channels/{channel_id}/documents/{document_id}/find-source?source_text=검색텍스트
+```
+
+**Query Parameters:**
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| source_text | string | O | 찾을 출처 텍스트 |
+| page_size | integer | X | 페이지 계산용 크기 |
+
+**Response (200 OK):**
+```json
+{
+  "found": true,
+  "location": {
+    "document_id": "files/abc123",
+    "filename": "api-spec.pdf",
+    "page_number": 3,
+    "position": 5000,
+    "context": "...앞뒤 맥락 텍스트...",
+    "highlights": [
+      {
+        "start": 100,
+        "end": 110,
+        "text": "검색텍스트"
+      }
+    ]
+  }
+}
+```
+
+### 미리보기 캐시 삭제
+
+```
+DELETE /channels/{channel_id}/documents/{document_id}/preview-cache
+```
+
+**Response (204 No Content)**
+
+---
+
+## 지원 파일 형식
+
+| 카테고리 | 확장자 |
+|---------|--------|
+| 문서 | .pdf, .docx, .pptx, .xlsx |
+| 텍스트 | .txt, .md, .html |
+| 데이터 | .json, .csv, .xml |
+| 코드 | .py, .js, .java, .cpp |
+
+## 제한사항
+
+| 항목 | 제한 |
+|------|------|
+| 파일 크기 | 최대 100MB |
+| 채널당 파일 수 | 최대 50개 (설정 가능) |
+| 채널당 용량 | 최대 100MB (설정 가능) |
