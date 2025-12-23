@@ -208,7 +208,12 @@ class TestDeleteChannel:
         app.dependency_overrides.pop(get_gemini_service, None)
 
     def test_delete_channel_metadata_not_found(self, client_with_db: TestClient, test_db):
-        """Test delete returns 404 when channel metadata is not in database."""
+        """Test delete creates metadata and soft-deletes when metadata is not in database.
+
+        When a channel exists in Gemini but has no local metadata,
+        the delete operation should create the metadata first, then soft-delete it.
+        This ensures consistency and prevents channel resurrection.
+        """
         channel_id = "fileSearchStores/store-123"
 
         # Gemini store exists but no local metadata
@@ -222,8 +227,8 @@ class TestDeleteChannel:
 
         response = client_with_db.delete(f"/api/v1/channels/{channel_id}")
 
-        assert response.status_code == 404
-        assert "metadata not found" in response.json()["detail"]
+        # Should succeed with 204 (metadata is created and soft-deleted)
+        assert response.status_code == 204
 
         app.dependency_overrides.pop(get_gemini_service, None)
 

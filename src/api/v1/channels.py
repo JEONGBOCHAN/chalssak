@@ -93,12 +93,21 @@ def list_channels(
         fav_repo = FavoriteRepository(db)
         favorited_ids = fav_repo.get_favorited_ids(TargetType.CHANNEL)
 
+        # Get all deleted channel IDs to filter them out
+        # This prevents "resurrection" of deleted channels when DB doesn't have metadata
+        deleted_store_ids = repo.get_deleted_store_ids()
+
         channels = []
         for store in stores:
             store_id = store["name"]
+
+            # Skip if channel is in the deleted list (even if no local metadata)
+            if store_id in deleted_store_ids:
+                continue
+
             # Get local metadata if exists
             local_meta = repo.get_by_gemini_id(store_id)
-            # Skip if channel is soft-deleted
+            # Skip if channel is soft-deleted (redundant check but kept for safety)
             if local_meta and local_meta.is_deleted:
                 continue
             channels.append(

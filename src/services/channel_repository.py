@@ -173,6 +173,20 @@ class ChannelRepository:
             ChannelMetadata.last_accessed_at < cutoff
         ).all()
 
+    def get_deleted_store_ids(self) -> set[str]:
+        """Get all soft-deleted channel Gemini store IDs.
+
+        Used to filter out deleted channels when listing from Gemini API.
+        This prevents "resurrection" of deleted channels.
+
+        Returns:
+            Set of deleted Gemini store IDs
+        """
+        deleted_channels = self.db.query(ChannelMetadata.gemini_store_id).filter(
+            ChannelMetadata.is_deleted == True  # noqa: E712
+        ).all()
+        return {c[0] for c in deleted_channels}
+
 
 class ChatHistoryRepository:
     """Repository for chat history operations."""
