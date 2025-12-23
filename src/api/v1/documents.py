@@ -332,19 +332,35 @@ def delete_document(
 ):
     """Delete a document.
 
-    Note: document_id should be the full file name (e.g., "files/xxx")
+    Note: document_id should be the full document name
+    (e.g., "fileSearchStores/xxx/documents/yyy")
     Optionally provide channel_id to invalidate related caches.
     """
-    success = gemini.delete_file(document_id)
+    # Extract channel_id from document_id if not provided
+    # Format: fileSearchStores/xxx/documents/yyy -> fileSearchStores/xxx
+    extracted_channel_id = channel_id
+    if not extracted_channel_id and document_id.startswith("fileSearchStores/"):
+        parts = document_id.split("/documents/")
+        if len(parts) >= 1:
+            extracted_channel_id = parts[0]
+
+    # Use the correct method based on document_id format
+    if document_id.startswith("fileSearchStores/"):
+        # File Search Store document
+        success = gemini.delete_store_document(document_id)
+    else:
+        # Legacy Files API
+        success = gemini.delete_file(document_id)
+
     if not success:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete document",
         )
 
-    # Invalidate caches if channel_id is provided
-    if channel_id:
-        cache.invalidate_document_cache(channel_id)
-        cache.invalidate_chat_cache(channel_id)
+    # Invalidate caches
+    if extracted_channel_id:
+        cache.invalidate_document_cache(extracted_channel_id)
+        cache.invalidate_chat_cache(extracted_channel_id)
 
     return None

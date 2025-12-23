@@ -190,10 +190,10 @@ class GeminiService:
         return files
 
     def delete_file(self, file_name: str) -> bool:
-        """Delete a file from File Search Store.
+        """Delete a file from Files API.
 
         Args:
-            file_name: The file name/ID
+            file_name: The file name/ID (e.g., "files/xxx")
 
         Returns:
             True if deleted successfully
@@ -205,6 +205,27 @@ class GeminiService:
             return response.status_code == 200
         except Exception:
             return False
+
+    def delete_store_document(self, document_name: str, force: bool = True) -> bool:
+        """Delete a document from File Search Store.
+
+        Uses REST API directly because SDK doesn't support force delete.
+
+        Args:
+            document_name: The document name (e.g., "fileSearchStores/xxx/documents/yyy")
+            force: If True, delete even if document has chunks
+
+        Returns:
+            True if deleted successfully or resource not found (already deleted)
+        """
+        url = f"https://generativelanguage.googleapis.com/v1beta/{document_name}"
+        if force:
+            url += "?force=true"
+        url += f"&key={self._api_key}" if force else f"?key={self._api_key}"
+
+        response = requests.delete(url)
+        # Treat 200 (success) and 404 (not found/already deleted) as success
+        return response.status_code in (200, 404)
 
     # ========== Chat/Search Operations ==========
 
