@@ -109,13 +109,22 @@ def list_channels(
             # Skip if channel is soft-deleted (redundant check but kept for safety)
             if local_meta and local_meta.is_deleted:
                 continue
+
+            # Get actual file count from Gemini API
+            files = gemini.list_store_files(store_id)
+            actual_file_count = len(files)
+
+            # Sync file_count if different
+            if local_meta and local_meta.file_count != actual_file_count:
+                repo.update_stats(store_id, file_count=actual_file_count)
+
             channels.append(
                 ChannelResponse(
                     id=store_id,
                     name=store.get("display_name", ""),
                     description=local_meta.description if local_meta else None,
                     created_at=local_meta.created_at if local_meta else datetime.now(UTC),
-                    file_count=local_meta.file_count if local_meta else 0,
+                    file_count=actual_file_count,
                     is_favorited=store_id in favorited_ids,
                 )
             )
@@ -190,15 +199,22 @@ def get_channel(
             detail=f"Channel not found: {channel_id}",
         )
 
-    # Update last accessed time in local DB
+    # Get actual file count from Gemini API
+    files = gemini.list_store_files(channel_id)
+    actual_file_count = len(files)
+
+    # Update last accessed time and sync file_count in local DB
     local_meta = repo.touch(channel_id)
+    if local_meta and local_meta.file_count != actual_file_count:
+        repo.update_stats(channel_id, file_count=actual_file_count)
+        local_meta = repo.get_by_gemini_id(channel_id)
 
     response = ChannelResponse(
         id=store["name"],
         name=store.get("display_name", ""),
         description=local_meta.description if local_meta else None,
         created_at=local_meta.created_at if local_meta else datetime.now(UTC),
-        file_count=local_meta.file_count if local_meta else 0,
+        file_count=actual_file_count,
         is_favorited=is_favorited,
     )
 
