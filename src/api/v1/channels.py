@@ -14,7 +14,6 @@ from src.core.database import get_db
 from src.core.rate_limiter import limiter, RateLimits
 from src.services.channel_repository import ChannelRepository
 from src.services.favorite_repository import FavoriteRepository
-from src.services.trash_repository import TrashRepository
 from src.services.cache_service import CacheService, get_cache_service
 
 router = APIRouter(prefix="/channels", tags=["channels"])
@@ -287,10 +286,10 @@ def delete_channel(
     db: Annotated[Session, Depends(get_db)],
     cache: Annotated[CacheService, Depends(get_cache_service)],
 ):
-    """Delete a channel (moves to trash).
+    """Delete a channel permanently.
 
-    The channel can be restored from the trash within 30 days.
-    Use DELETE /trash/channel/{id} for permanent deletion.
+    This deletes the channel from both Gemini and the local database.
+    Note: When trash UI is implemented, this will change to soft delete.
     """
     # First check if channel exists
     store = gemini.get_store(channel_id)
@@ -300,19 +299,18 @@ def delete_channel(
             detail=f"Channel not found: {channel_id}",
         )
 
-    # Soft delete (move to trash) - create metadata if it doesn't exist
-    trash_repo = TrashRepository(db)
-    channel = trash_repo.soft_delete_channel(channel_id)
-
-    if not channel:
-        # Metadata doesn't exist, create it first then soft delete
-        repo = ChannelRepository(db)
-        repo.create(
-            gemini_store_id=channel_id,
-            name=store.get("display_name", ""),
-            description=None,
+    # Delete from Gemini first
+    try:
+        gemini.delete_store(channel_id, force=True)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete channel from Gemini: {str(e)}",
         )
-        channel = trash_repo.soft_delete_channel(channel_id)
+
+    # Delete from local DB
+    repo = ChannelRepository(db)
+    repo.delete(channel_id)
 
     # Invalidate all caches related to this channel
     cache.invalidate_channel(channel_id)
