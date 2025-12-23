@@ -12,7 +12,7 @@
 
 **Document Analysis Tool powered by RAG + AI Agent**
 
-[Features](#features) • [Quick Start](#quick-start) • [Architecture](#architecture) • [API](#api-documentation)
+[Features](#features) • [Tech Stack](#tech-stack) • [Architecture](#architecture) • [Quick Start](#quick-start)
 
 [한국어](README_KR.md)
 
