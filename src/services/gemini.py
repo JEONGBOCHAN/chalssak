@@ -1497,6 +1497,170 @@ Example format:
                 "error": str(e),
             }
 
+    # ========== Agent Support Operations ==========
+
+    def search_documents(
+        self,
+        store_name: str,
+        query: str,
+        model: str = "gemini-3-flash-preview",
+    ) -> dict[str, Any]:
+        """Search documents and return results for agent use.
+
+        This is a simplified search that returns sources without generating
+        a full answer. Used by the Agent's search tool.
+
+        Args:
+            store_name: The store name/ID to search in
+            query: The search query
+            model: The model to use
+
+        Returns:
+            Dict with 'sources' list and optional 'error'
+        """
+        try:
+            # Use a simple search prompt
+            search_prompt = f"Find information about: {query}\n\nReturn the relevant content from the documents."
+
+            response = self._client.models.generate_content(
+                model=model,
+                contents=search_prompt,
+                config=types.GenerateContentConfig(
+                    tools=[
+                        types.Tool(
+                            file_search=types.FileSearch(
+                                file_search_store_names=[store_name]
+                            )
+                        )
+                    ]
+                ),
+            )
+
+            # Extract grounding sources from response
+            sources = []
+            if hasattr(response, "candidates") and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, "grounding_metadata"):
+                    metadata = candidate.grounding_metadata
+                    if hasattr(metadata, "grounding_chunks"):
+                        for chunk in metadata.grounding_chunks:
+                            ctx = getattr(chunk, "retrieved_context", None)
+                            source_name = "unknown"
+                            content = ""
+                            if ctx:
+                                source_name = getattr(ctx, "title", None) or getattr(ctx, "uri", None) or "unknown"
+                                content = getattr(ctx, "text", "") or ""
+                            sources.append({
+                                "source": source_name,
+                                "content": content,
+                            })
+
+            return {"sources": sources}
+
+        except Exception as e:
+            return {"sources": [], "error": str(e)}
+
+    def call_with_tools(
+        self,
+        prompt: str,
+        tools: list[dict],
+        model: str = "gemini-2.5-flash-preview-05-20",
+    ) -> dict[str, Any]:
+        """Call Gemini with function calling (tools).
+
+        Args:
+            prompt: The prompt to send
+            tools: List of tool definitions in Gemini format
+            model: The model to use
+
+        Returns:
+            Dict with 'text', 'tool_call', and 'thinking'
+        """
+        try:
+            # Convert tool definitions to Gemini format
+            function_declarations = []
+            for tool in tools:
+                function_declarations.append(
+                    types.FunctionDeclaration(
+                        name=tool["name"],
+                        description=tool["description"],
+                        parameters=tool["parameters"],
+                    )
+                )
+
+            gemini_tools = [
+                types.Tool(function_declarations=function_declarations)
+            ]
+
+            response = self._client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=gemini_tools,
+                ),
+            )
+
+            result = {
+                "text": None,
+                "tool_call": None,
+                "thinking": None,
+            }
+
+            # Extract response
+            if hasattr(response, "candidates") and response.candidates:
+                candidate = response.candidates[0]
+
+                # Check for function call
+                if hasattr(candidate, "content") and candidate.content:
+                    for part in candidate.content.parts:
+                        if hasattr(part, "function_call") and part.function_call:
+                            fc = part.function_call
+                            result["tool_call"] = {
+                                "name": fc.name,
+                                "args": dict(fc.args) if fc.args else {},
+                            }
+                        elif hasattr(part, "text") and part.text:
+                            result["text"] = part.text
+
+            # If no function call, use text response
+            if not result["tool_call"] and response.text:
+                result["text"] = response.text
+
+            return result
+
+        except Exception as e:
+            return {
+                "text": None,
+                "tool_call": None,
+                "thinking": None,
+                "error": str(e),
+            }
+
+    def generate(
+        self,
+        prompt: str,
+        model: str = "gemini-2.5-flash-preview-05-20",
+    ) -> dict[str, Any]:
+        """Simple text generation without tools.
+
+        Args:
+            prompt: The prompt to send
+            model: The model to use
+
+        Returns:
+            Dict with 'text' and optional 'error'
+        """
+        try:
+            response = self._client.models.generate_content(
+                model=model,
+                contents=prompt,
+            )
+
+            return {"text": response.text if response.text else ""}
+
+        except Exception as e:
+            return {"text": "", "error": str(e)}
+
     # ========== Audio Overview (Podcast) Operations ==========
 
     def generate_podcast_script(
